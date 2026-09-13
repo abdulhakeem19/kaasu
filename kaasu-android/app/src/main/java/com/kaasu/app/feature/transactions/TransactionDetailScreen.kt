@@ -39,6 +39,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -257,7 +258,7 @@ private fun HeroCard(tx: Transaction, category: Category?) {
     }
     val amountWithoutSymbol = tx.amountInPaise.formatRupees().removePrefix("₹")
 
-    val dateFormat = SimpleDateFormat("EEEE, d MMM yyyy", Locale.getDefault())
+    val dateFormat = SimpleDateFormat("EEEE, d MMM yyyy", LocalConfiguration.current.locales[0])
     val formattedDate = dateFormat.format(Date(tx.transactionTime))
 
     val merchantInitial = (tx.merchantName ?: "?").firstOrNull()?.uppercaseChar()?.toString() ?: "?"

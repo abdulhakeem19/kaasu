@@ -15,6 +15,33 @@ Updated with each push-worthy commit. The goal is to always know the path we cam
 
 ---
 
+## [Phase 10: Toolchain upgrade — AGP 9, Kotlin 2.4, compileSdk 37] — 2026-09-13
+### Changed
+- Upgraded the whole toolchain in one commit rather than piecemeal. Dependabot had opened five
+  separate PRs that each failed on their own, because the upgrades are interdependent: the new
+  androidx libraries need AGP 9.1+, AGP 9.4 needs Gradle 9.6+, and the androidx artifacts need
+  `compileSdk` 37. Nothing moves until all of it moves.
+  - Gradle 8.10.2 → 9.7.1, AGP 8.7.2 → 9.4.0, Kotlin 2.1.0 → 2.4.20
+  - KSP 2.1.0-1.0.29 → 2.3.12 (KSP has moved to standalone versioning, no longer Kotlin-coupled)
+  - Hilt 2.56.2 → 2.60.1, Compose BOM 2025.01 → 2026.09, coroutines 1.9.0 → 1.11.0
+  - Room 2.7.0 → 2.8.5, navigation 2.8.5 → 2.10.1, and the rest of the androidx group
+- **AGP 9 provides Kotlin support itself**, so the `org.jetbrains.kotlin.android` plugin had to be
+  removed from both build files, and `android.kotlinOptions` — deleted in AGP 9 — was replaced by
+  `kotlin { compilerOptions { jvmTarget } }`.
+- `compileSdk` 35 → 37, required by the androidx artifacts. `targetSdk` deliberately stays at 35:
+  raising it opts the app into new runtime behaviour, which is a separate change that deserves
+  device testing on its own rather than riding along with a dependency bump.
+- `vico` is held at 2.0.1. The 3.x release is a breaking API rewrite of the charting layer, which
+  is a code migration rather than a version bump and does not belong in this commit.
+
+### Fixed
+- Six `Locale.getDefault()` reads inside composables now read `LocalConfiguration.current.locales[0]`.
+  The updated Compose lint flags the old form as `NonObservableLocale` — it is genuinely a bug, not
+  just a style rule: a composable reading the default locale that way does not recompose when the
+  device locale changes, so dates and month names would keep rendering in the previous language.
+
+---
+
 ## [Phase 10: Open-source readiness] — 2026-09-13
 ### Removed
 - **Real personal data scrubbed from the repository.** Parser tests and changelog entries carried
