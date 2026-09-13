@@ -15,6 +15,16 @@ Updated with each push-worthy commit. The goal is to always know the path we cam
 
 ---
 
+## [v1.0.1] — 2026-09-13
+### Fixed
+- Onboarding was unreadable in dark mode — the first screen a new user saw, and v1.0.0 shipped
+  with it. Worth a release on its own.
+
+### Added
+- "காசு · Tamil for money" on both About surfaces.
+
+---
+
 ## [Phase 10: Onboarding contrast fix + showcase screenshots] — 2026-09-13
 ### Fixed
 - **Onboarding was unreadable in dark mode.** Its root used `KaasuColors.onForest` as the page
