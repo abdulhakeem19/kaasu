@@ -35,14 +35,26 @@ matter most are therefore:
 - A parser mis-reading a message, or missing a bank. Those are ordinary bugs; open a normal issue.
 - Anything requiring physical access to an unlocked, already-authenticated device.
 
-## Supported versions
-
-Kaasu is distributed as source, not as a released binary. Fixes land on `main`; there is no backport
-process for older tags.
-
 ## A note on installing this
 
-Kaasu is not on Google Play and is meant to be built from source for your own device. If you are
-offered a prebuilt Kaasu APK from anywhere other than this repository, treat it as untrusted — an
-app with notification, SMS and accessibility access is worth attacking, and you have no way to know
-what is inside a binary someone else compiled.
+Kaasu is not on Google Play. Official builds are published as signed APKs on the
+[releases page](../../releases), built by GitHub Actions from a tagged commit — no binary is
+uploaded from anyone's machine.
+
+**Only install Kaasu from this repository's releases, or build it from source.** An app holding
+notification, SMS and accessibility access is worth attacking, and you cannot tell what is inside
+an APK someone else compiled. Every release publishes a SHA-256 checksum next to the APK; verifying
+it takes one command:
+
+```bash
+sha256sum kaasu-1.0.0.apk
+```
+
+If a Kaasu build is offered anywhere else — a mirror, an APK site, a chat forward — treat it as
+untrusted regardless of how legitimate it looks.
+
+## Supported versions
+
+Kaasu is a personal project maintained in spare time. Fixes land on `main` and go out in the next
+release; there is no backport process for older tags. If you are running an old APK, updating is
+the fix.

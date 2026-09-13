@@ -15,6 +15,25 @@ Updated with each push-worthy commit. The goal is to always know the path we cam
 
 ---
 
+## [Phase 10: Releases — downloadable signed APK] — 2026-09-13
+### Added
+- `.github/workflows/release.yml` — tagging `v*` builds, tests, signs and publishes a release APK
+  with its SHA-256 checksum attached. Signing material comes from repository secrets, is written to
+  disk only for the build, and is deleted by a step that runs even when the build fails.
+- The workflow fails loudly when `KEYSTORE_BASE64` is absent rather than quietly publishing an
+  unsigned APK, which no device can install.
+- `docs/RELEASING.md` — how to create the keystore, which four secrets to add, and how to cut a
+  release. Spells out that the signing key must be kept forever: Android identifies an app by its
+  key, so losing it means no existing install can ever be updated.
+- README gained an **Install** section leading with the APK download, plus a checksum-verification
+  step — worth the extra line for an app that reads bank messages.
+
+### Changed
+- README and `SECURITY.md` previously said Kaasu was source-only. Now that a binary exists, both say
+  to install *only* from this repository's releases or from source, and how to verify the download.
+
+---
+
 ## [Phase 10: Toolchain upgrade — AGP 9, Kotlin 2.4, compileSdk 37] — 2026-09-13
 ### Changed
 - Upgraded the whole toolchain in one commit rather than piecemeal. Dependabot had opened five
