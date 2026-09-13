@@ -94,7 +94,11 @@ fun OnboardingScreen(
         label = "onboarding_page",
         modifier = Modifier
             .fillMaxSize()
-            .background(KaasuColors.onForest)
+            // The page background, so it must be a background role. This used to be `onForest` —
+            // the cream that sits *on* the green — which only looked right in light mode. In dark
+            // mode it resolves near-white and the headings, which use `ink` (also near-white in
+            // dark), disappeared into it entirely.
+            .background(MaterialTheme.colorScheme.background)
     ) { page ->
         when (page) {
             0 -> WelcomePage(
