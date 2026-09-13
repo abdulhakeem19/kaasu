@@ -48,7 +48,9 @@ jobs:
           fi
           echo "$KEYSTORE_BASE64" | base64 --decode > kaasu-android/kaasu-release.jks
           cat > kaasu-android/keystore.properties <<EOF
-          storeFile=kaasu-release.jks
+          # storeFile is resolved by file() inside app/build.gradle.kts, so it is relative to the
+          # app module rather than to this file — hence the ../ to reach the project root.
+          storeFile=../kaasu-release.jks
           storePassword=$KEYSTORE_PASSWORD
           keyAlias=$KEY_ALIAS
           keyPassword=$KEY_PASSWORD
