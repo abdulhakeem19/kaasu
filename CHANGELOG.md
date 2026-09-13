@@ -15,6 +15,15 @@ Updated with each push-worthy commit. The goal is to always know the path we cam
 
 ---
 
+## [v1.0.2] — 2026-09-13
+### Changed
+- Onboarding no longer asks for accessibility access as though it worked. v1.0.1 shipped a page
+  headed "Catch what notifications miss" with an "Allow screen reading" button, for a channel that
+  captures nothing — a misleading request for Android's most powerful permission class, which is
+  worth a release on its own.
+
+---
+
 ## [Phase 10: Accessibility channel documented as non-functional] — 2026-09-13
 ### Changed
 - **The accessibility capture channel does not work, and the app now says so.** Measured against
