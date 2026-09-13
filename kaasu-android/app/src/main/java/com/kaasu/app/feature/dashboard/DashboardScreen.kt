@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -178,7 +179,7 @@ fun DashboardScreen(
 @Composable
 private fun DashboardHeader(displayName: String, onSearchClick: () -> Unit) {
     val today = LocalDate.now()
-    val dayName = today.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+    val dayName = today.dayOfWeek.getDisplayName(TextStyle.FULL, LocalConfiguration.current.locales[0])
         .uppercase()
     val firstName = displayName.trim().substringBefore(' ').ifBlank { null }
 

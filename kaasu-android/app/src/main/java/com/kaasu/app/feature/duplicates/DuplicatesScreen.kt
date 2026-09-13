@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,7 +45,7 @@ fun DuplicatesScreen(
     viewModel: DuplicatesViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val dateFmt = SimpleDateFormat("d MMM yyyy · h:mm a", Locale.getDefault())
+    val dateFmt = SimpleDateFormat("d MMM yyyy · h:mm a", LocalConfiguration.current.locales[0])
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
