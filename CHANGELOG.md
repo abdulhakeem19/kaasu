@@ -15,6 +15,22 @@ Updated with each push-worthy commit. The goal is to always know the path we cam
 
 ---
 
+## [Phase 10: Onboarding contrast fix + showcase screenshots] — 2026-09-13
+### Fixed
+- **Onboarding was unreadable in dark mode.** Its root used `KaasuColors.onForest` as the page
+  background — that is the cream which sits *on* the brand green, not a background role. In light
+  mode it passed for one; in dark mode it resolved near-white while the headings, which use `ink`
+  (also near-white in dark), disappeared into it completely. Now uses
+  `MaterialTheme.colorScheme.background`. This was the first screen a new user saw, and the
+  released v1.0.0 shipped with it.
+
+### Added
+- Screenshots in `docs/screenshots/`, shown in the README. Captured from a throwaway `.demo` build
+  seeded with invented merchants and amounts — never from a real install, whose every screen shows
+  real merchants, real balances and the names of real people who sent money.
+
+---
+
 ## [Phase 10: Name and origin] — 2026-09-13
 ### Added
 - The README now says what the name means — *kaasu* · **காசு** · Tamil for money — directly under

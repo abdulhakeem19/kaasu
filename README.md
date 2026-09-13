@@ -129,13 +129,15 @@ Cutting a release? See [docs/RELEASING.md](docs/RELEASING.md).
 
 ## 📱 Screenshots
 
-> _Not published yet._ Screenshots of a real install show real merchants, real amounts and the names
-> of real people who sent money — so they can't simply be pasted in. Add sanitised captures to
-> `docs/screenshots/` and link them here.
+<div align="center">
 
 | Dashboard | Transactions | Insights |
 |:---:|:---:|:---:|
-| _coming soon_ | _coming soon_ | _coming soon_ |
+| <img src="docs/screenshots/dashboard.png" width="230" alt="Monthly spend, weekly trend and today's transactions"> | <img src="docs/screenshots/transactions.png" width="230" alt="Searchable, filterable transaction list grouped by day"> | <img src="docs/screenshots/insights.png" width="230" alt="Monthly spending broken down by category"> |
+
+<sub>Sample data — not a real account.</sub>
+
+</div>
 
 ---
 
