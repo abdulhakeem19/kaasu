@@ -1,0 +1,17 @@
+# Normalise line endings so a Windows checkout doesn't produce a whole-file diff.
+* text=auto eol=lf
+
+*.bat  text eol=crlf
+*.jar  binary
+*.png  binary
+*.jpg  binary
+*.webp binary
+*.keystore binary
+*.jks  binary
+
+# Keep generated/vendored files out of GitHub's language statistics and diffs.
+kaasu-android/gradlew        linguist-vendored
+kaasu-android/gradlew.bat    linguist-vendored
+kaasu-android/gradle/wrapper/** linguist-vendored
+kaasu-android/app/schemas/**  linguist-generated
+CHANGELOG.md                 linguist-documentation

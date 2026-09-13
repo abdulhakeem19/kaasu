@@ -1,0 +1,23 @@
+version: 2
+updates:
+  - package-ecosystem: "gradle"
+    directory: "/kaasu-android"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+    groups:
+      # One PR per ecosystem rather than a dozen: these libraries are versioned together and
+      # updating them piecemeal tends to produce PRs that cannot build on their own.
+      androidx:
+        patterns: ["androidx.*"]
+      kotlin-and-compose:
+        patterns: ["org.jetbrains.kotlin*", "androidx.compose*"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    commit-message:
+      prefix: "chore"

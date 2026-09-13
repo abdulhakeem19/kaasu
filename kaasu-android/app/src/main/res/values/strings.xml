@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kaasu</string>
+    <string name="accessibility_service_description">Kaasu reads on-screen transaction-history text from the UPI/banking apps enabled below (currently Google Pay and PhonePe) — only while you have one of them open, and only their transaction-list screens — to catch payments its other capture methods missed, such as a dismissed notification or an in-app-only balance change. It does NOT read PIN or password entry screens, does NOT tap, type, or navigate anything on your behalf, and nothing it reads is ever sent anywhere — it stays on this device, same as every other part of Kaasu.</string>
+</resources>

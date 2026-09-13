@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Two-layer scope filter, layer (a) — see KaasuAccessibilityService's class doc for layer (b).
+    packageNames is the exact same superset SourceApps.PAYMENT_APP_PACKAGES uses for the
+    notification-listener allow-list, kept in sync by hand (no build-time codegen for a manifest
+    resource) — Android drops events from every other app before this process ever sees them.
+    accessibilityEventTypes is deliberately narrow: window-state/content-changed only, never a
+    click or text-changed type, so this service can never observe PIN-entry keystrokes or taps.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:accessibilityFlags="flagReportViewIds"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/accessibility_service_description"
+    android:notificationTimeout="300"
+    android:packageNames="com.google.android.apps.nbu.paisa.user,com.phonepe.app,net.one97.paytm,in.org.npci.upiapp,com.amazon.mShop.android.shopping,com.dreamplug.androidapp,com.bharatpe.app,com.bharatpe.merchant,com.mobikwik_new,com.freecharge.android,com.slicepay,com.fampay.in,com.csam.icici.bank.imobile,com.sbi.lotusintouch,com.sbi.card,com.axis.mobile,com.mgs.indusind,com.idfcfirstbank.optimus,com.UnionBank.retail,com.snapwork.hdfc,com.msf.kbank.mobile,com.bankofbaroda.mconnect,com.canarabank.mobility,com.fss.pnbpsp" />

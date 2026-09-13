@@ -1,0 +1,62 @@
+name: 🏦 Bank or app not supported
+description: Kaasu misses or misreads transactions from a particular bank or payment app
+labels: [parser, bank-support]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### ⚠️ Anonymise every sample before posting
+
+        Replace names with invented ones, account tails with `XX1234`, and reference numbers with
+        `100000000001`. **Keep the bank's exact wording** — that is the only part the parser reads.
+
+  - type: input
+    id: bank
+    attributes:
+      label: Bank or payment app
+      placeholder: "Canara Bank / CRED / Bank of Baroda"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: behaviour
+    attributes:
+      label: What goes wrong?
+      options:
+        - Transactions are not captured at all
+        - Captured, but the amount is wrong
+        - Captured, but shows as income instead of expense (or vice versa)
+        - Captured, but the merchant is missing or garbled
+        - The same payment is stored twice
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: debit
+    attributes:
+      label: Anonymised debit message
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: credit
+    attributes:
+      label: Anonymised credit message
+      description: Banks word credits differently from debits, so both are useful.
+      render: text
+
+  - type: input
+    id: channel
+    attributes:
+      label: How does it arrive?
+      placeholder: "SMS from JM-CANBNK-S / notification from the bank's app"
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: I have removed all real names, account numbers, reference numbers and balances
+          required: true

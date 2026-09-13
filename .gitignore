@@ -1,0 +1,50 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Android
+*.iml
+.gradle/
+local.properties
+.idea/
+.idea/caches
+.idea/libraries
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+build/
+/captures
+.externalNativeBuild
+.cxx
+*.apk
+*.aab
+*.ap_
+
+# Kotlin
+*.class
+*.kotlin_module
+
+# Gradle
+# gradle-wrapper.jar is deliberately NOT ignored: without it a fresh clone cannot run ./gradlew,
+# which breaks CI and every new contributor. Gradle's own guidance is to commit the wrapper.
+.gradle
+
+# Keystore
+*.jks
+*.keystore
+release-key.properties
+
+# Kotlin build metadata
+kaasu-android/.kotlin/
+
+# Claude Design handoff bundle (external design-tool scratch, not repo content)
+/kaasu/
+/Kaasu-handoff.zip
+
+# Release signing (never commit)
+keystore.properties
+
+# Real personal financial data (sample statements for parser development — never commit)
+/Statements/

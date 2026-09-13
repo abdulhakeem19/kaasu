@@ -1,0 +1,38 @@
+name: ✨ Feature request
+description: Suggest a capability or an improvement
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Kaasu is local-only by design. Anything that uploads transaction data, adds analytics over
+        spending content, or automates taps through the accessibility service will be declined —
+        see [CONTRIBUTING.md](https://github.com/abdulhakeem19/kaasu/blob/main/CONTRIBUTING.md).
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the situation you're in, not the solution you have in mind.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like it to do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything you've tried or considered instead?
+
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Does this fit the project?
+      options:
+        - label: This does not require sending transaction data off the device
+          required: true

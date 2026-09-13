@@ -1,0 +1,82 @@
+name: 🐛 Bug report
+description: Something in the app behaves incorrectly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### ⚠️ Before you write anything: do not paste a real bank message
+
+        A real SMS or notification contains your account tail, a reference number, and often
+        **another person's name**. Change those to invented values first. The sentence structure is
+        the only part that helps debug a parser.
+
+        Reporting a **security or privacy** issue? Don't use this form — see
+        [SECURITY.md](https://github.com/abdulhakeem19/kaasu/blob/main/SECURITY.md).
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the app?
+      options:
+        - Capture — a transaction was missed or captured twice
+        - Parsing — wrong amount, merchant, type or note
+        - Categories or rules
+        - Budgets or subscriptions
+        - Statement import
+        - UI, theme or navigation
+        - Backup, export or delete
+        - Something else / not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: sample
+    attributes:
+      label: Anonymised message sample
+      description: >
+        For a capture or parsing bug, the message text with every personal detail replaced.
+        Keep the bank's wording and punctuation exactly as they are.
+      placeholder: "Your A/c XX1234 debited by Rs. 250.00 on 01/01/26; RAVI KUMAR credited. RRN 100000000001"
+      render: text
+
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android version
+      placeholder: "Motorola Edge 60 Pro, Android 16"
+    validations:
+      required: true
+
+  - type: input
+    id: source
+    attributes:
+      label: Which capture channel?
+      placeholder: "Notification / SMS / statement import / accessibility"
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: I have removed all real names, account numbers, reference numbers and balances
+          required: true
