@@ -26,9 +26,28 @@ This is not a normal runtime permission dialog. The user must manually enable Ka
 
 Used for live SMS transaction capture (`SmsReceiver`) and a one-time historical inbox backfill (`SmsBackfillWorker`), on `feature/sms-capture`. Previously listed under "Avoid" below when this was a public-app document; that constraint was Play-policy-driven and no longer applies to a personal build. The same on-device-only, no-upload handling rules apply to SMS content as to notification content.
 
-### 3. Accessibility Service — in progress, not yet complete
+### 3. Accessibility Service — implemented, but non-functional against current UPI apps
 
-Planned to read UPI apps' (GPay/PhonePe) own on-screen transaction history directly, for cases notifications and SMS both miss. Being implemented on a separate branch as of this writing; treat as underway, not finished.
+Built to read UPI apps' (GPay/PhonePe) own on-screen transaction history directly, for payments
+notifications and SMS both miss. The code ships and its scope filter is sound, but **measured
+against current Google Pay it captures nothing**, for two independent reasons:
+
+1. `BaseTransactionScreenScraper.isTransactionScreen()` decides a screen is a history screen by
+   matching `viewIdResourceName` substrings (`transaction`/`txn`/`history`/`amount`). Dumping
+   GPay's accessibility tree returns exactly **one** resource-id, `android:id/content`. The check
+   can never pass.
+2. `collectLeafTexts()` reads `node.text` only. GPay exposes **zero** text nodes — its content sits
+   in `contentDescription`, which the scraper never looks at. Even if (1) were fixed, it would
+   collect no fragments.
+
+GPay is also behind a biometric lock that a deliberately passive service cannot pass.
+
+Because this asks for the most powerful permission class on Android, the onboarding page and the
+README now say plainly that it does not work and should be left off. The channel is kept rather
+than deleted: the two-layer scope filter and the parser reuse are the expensive parts and stay
+correct, so a working scraper would be a contained change. Reviving it needs, at minimum, reading
+`contentDescription` alongside `text` and replacing resource-id detection with something these apps
+actually expose.
 
 ## Optional
 

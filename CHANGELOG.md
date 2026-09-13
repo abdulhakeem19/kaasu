@@ -15,6 +15,27 @@ Updated with each push-worthy commit. The goal is to always know the path we cam
 
 ---
 
+## [Phase 10: Accessibility channel documented as non-functional] — 2026-09-13
+### Changed
+- **The accessibility capture channel does not work, and the app now says so.** Measured against
+  current Google Pay on a real device, it captures nothing for two independent reasons:
+  - `isTransactionScreen()` matches `viewIdResourceName` substrings. A dump of GPay's accessibility
+    tree returns exactly one resource-id, `android:id/content` — the check can never pass.
+  - `collectLeafTexts()` reads `node.text`. GPay exposes zero text nodes; its content is in
+    `contentDescription`, which the scraper never reads. Even with (1) fixed it would find nothing.
+  GPay is also behind a biometric lock a passive service cannot pass. Corroborated by the database:
+  across 1,043 captured transactions, `app_sources` records **zero** scrape attempts ever.
+- The onboarding page previously headed "Catch what notifications miss" with a button reading
+  "Allow screen reading". Soliciting Android's most powerful permission class for a feature that
+  provably does nothing is a worse failure than the README overstating it, so the page now leads
+  with "Screen reading (not working yet)", explains why, and recommends skipping.
+- README and `PERMISSION_STRATEGY.md` updated to match. The feature count in the README drops from
+  four capture channels to three, because three is the number that work.
+- The channel is documented rather than deleted: the two-layer scope filter and the parser reuse are
+  the expensive parts and remain correct, so a working scraper would be a contained change.
+
+---
+
 ## [v1.0.1] — 2026-09-13
 ### Fixed
 - Onboarding was unreadable in dark mode — the first screen a new user saw, and v1.0.0 shipped

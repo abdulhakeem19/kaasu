@@ -89,8 +89,7 @@ capture can't be exercised on an emulator.
 |:---:|---|
 | **1** | Grant **notification access** when asked — this opens Android Settings, it isn't a normal popup |
 | **2** | *Optional:* grant SMS access, then **Settings → Re-scan SMS inbox** to pull in past messages |
-| **3** | *Optional:* enable the accessibility service to catch anything the first two missed |
-| **4** | *Optional:* **Settings → Re-scan saved transactions** to fill in anything captured earlier |
+| **3** | *Optional:* **Settings → Re-scan saved transactions** to fill in anything captured earlier |
 
 > **Requires Android 8.0 (API 26) or later.**
 
@@ -116,7 +115,7 @@ Cutting a release? See [docs/RELEASING.md](docs/RELEASING.md).
 
 |   | Feature | |
 |:---:|---|---|
-| 🔔 | **Four ways to capture** | Notification listener, direct SMS, statement import (CSV/PDF/XLSX), and an optional passive screen reader — all feeding one pipeline |
+| 🔔 | **Three ways to capture** | Notification listener, direct SMS, and statement import (CSV/PDF/XLSX) — all feeding one pipeline |
 | 🏷️ | **Learns your categories** | Tag one "SWIGGY" by hand and every later one follows. Most-frequent wins, so one misfiling can't re-teach the wrong category |
 | 🧾 | **Keeps your note** | The "Bike repair" you typed while paying in GPay lands on the transaction |
 | 🔁 | **Kills duplicates** | The same payment arriving by notification *and* SMS is stored once |
@@ -159,13 +158,27 @@ Kaasu asks for more than most trackers. You should know exactly why before grant
 |---|---|:---:|
 | **Notification access** | Reads payment notifications — the main capture channel | ✅ Yes |
 | **`RECEIVE_SMS` / `READ_SMS`** | Catches bank SMS for payments that send no notification | Optional |
-| **Accessibility service** | Passively reads GPay/PhonePe's *own* history screen to catch what nothing else saw | Optional, off by default |
+| **Accessibility service** | Experimental fourth channel. **Does not currently work** — see below. Leave it off | Off by default |
 | **`POST_NOTIFICATIONS`** | Budget alerts | Optional |
 
-The accessibility channel is the most powerful permission class on Android, so it is deliberately
-the most conservative code in the project: **purely passive** — it never taps, navigates or
-automates anything — and scoped statically to payment-app packages and window-change events only,
-so it cannot observe PIN entry or arbitrary keystrokes.
+> ### ⚠️ The accessibility channel does not work — don't enable it
+>
+> It was built to read GPay/PhonePe's own transaction-history screen for payments the other
+> channels missed. Tested against current GPay, **it cannot capture anything**:
+>
+> - It decides a screen is a history screen by matching view resource-ids. GPay exposes exactly
+>   one id to the accessibility tree (`android:id/content`), so that check can never pass.
+> - It reads text from `node.text`. GPay exposes **no** text nodes at all — its content lives in
+>   `contentDescription`, which the scraper never reads.
+> - GPay sits behind a biometric lock a passive service cannot pass.
+>
+> The code ships but the feature is dormant, and enabling it grants Android's most powerful
+> permission class for no benefit. Tracked as a known limitation rather than removed, since the
+> scope filter and parser reuse are worth keeping if the scraper can be made to work.
+
+When it *is* enabled, it is deliberately the most conservative code in the project: **purely
+passive** — it never taps, navigates or automates anything — and scoped statically to payment-app
+packages and window-change events only, so it cannot observe PIN entry or arbitrary keystrokes.
 Full reasoning in [`PERMISSION_STRATEGY.md`](docs/PERMISSION_STRATEGY.md).
 
 > ### ℹ️ Kaasu is not on Google Play, and won't be

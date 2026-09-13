@@ -598,7 +598,7 @@ private fun AccessibilityPage(onNext: () -> Unit) {
         Spacer(Modifier.height(24.dp))
 
         Text(
-            text = "Catch what notifications miss",
+            text = "Screen reading (not working yet)",
             fontSize = 30.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = (-1.2).sp,
@@ -607,11 +607,17 @@ private fun AccessibilityPage(onNext: () -> Unit) {
         )
         Spacer(Modifier.height(14.dp))
         Text(
-            text = "Optional, and the lowest-priority of Kaasu's capture methods. When you scroll your " +
-                "own Google Pay or PhonePe transaction history in normal use, Kaasu can read that " +
-                "on-screen text to catch a payment the other methods missed — a dismissed notification, " +
-                "for example. It never opens these apps itself, never taps or types anything for you, " +
-                "and never reads PIN or password screens. Nothing it reads leaves your device.",
+            // Honest copy beats a good pitch here. Tested against current Google Pay, this channel
+            // captures nothing: GPay exposes no text nodes and a single view id to the accessibility
+            // tree, so the scraper's screen detection can never match and it would read no text even
+            // if it did. Asking for Android's most powerful permission class on the strength of a
+            // feature that does not function would be the worst trade in this app.
+            text = "This would let Kaasu read your Google Pay or PhonePe transaction history " +
+                "on screen, to catch a payment the other methods missed.\n\n" +
+                "It does not currently work — those apps no longer expose their screen text in a " +
+                "way Kaasu can read. Turning it on grants Android's most powerful permission and " +
+                "gains you nothing today, so leave it off. Notifications, SMS and statement import " +
+                "are unaffected.",
             fontSize = 15.sp,
             fontWeight = FontWeight.Medium,
             lineHeight = 22.sp,
@@ -633,7 +639,7 @@ private fun AccessibilityPage(onNext: () -> Unit) {
                     .background(if (isGranted) KaasuColors.income else KaasuColors.muted)
             )
             Text(
-                text = if (isGranted) "Screen reading enabled" else "Not enabled — everything else still works",
+                text = if (isGranted) "Enabled — but it captures nothing today" else "Off — recommended",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = if (isGranted) KaasuColors.income else KaasuColors.muted
@@ -644,7 +650,7 @@ private fun AccessibilityPage(onNext: () -> Unit) {
             CtaButton(text = "Continue", onClick = onNext)
         } else {
             CtaButton(
-                text = "Allow screen reading",
+                text = "Turn it on anyway",
                 onClick = { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
             )
         }
@@ -659,7 +665,7 @@ private fun AccessibilityPage(onNext: () -> Unit) {
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "Skip — I'll rely on notifications and SMS",
+                text = "Skip — recommended",
                 color = KaasuColors.forest,
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp
