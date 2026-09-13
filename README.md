@@ -19,8 +19,9 @@ already receives — and keeps every rupee of it on your device.
 [![Kotlin](https://img.shields.io/badge/Kotlin-100%25-7f52ff?style=flat-square&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Compose](https://img.shields.io/badge/Jetpack%20Compose-4285f4?style=flat-square&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![CI](https://img.shields.io/github/actions/workflow/status/abdulhakeem19/kaasu/android.yml?branch=main&style=flat-square&label=CI)](../../actions)
+[![Download](https://img.shields.io/github/v/release/abdulhakeem19/kaasu?style=flat-square&label=download&color=2ea44f)](../../releases/latest)
 
-[Quick start](#-quick-start) · [Features](#-what-it-does) · [Privacy](#-privacy-concretely) · [How it works](#️-how-it-works) · [Contributing](#-contributing)
+[Install](#-install) · [Features](#-what-it-does) · [Privacy](#-privacy-concretely) · [How it works](#️-how-it-works) · [Contributing](#-contributing)
 
 </div>
 
@@ -42,7 +43,34 @@ Nothing leaves your phone — there is no server for it to leave to.
 
 ---
 
-## 🚀 Quick start
+## 📥 Install
+
+### Option 1 — download the APK *(easiest)*
+
+**[⬇️ Download the latest release](../../releases/latest)**
+
+1. Grab `kaasu-x.y.z.apk` from the release page on your phone.
+2. Open it. Android will ask you to allow installs from your browser or file manager — that prompt
+   is normal for any app not from the Play Store.
+3. Open Kaasu and finish onboarding.
+
+<details>
+<summary><b>Verify what you downloaded</b> — worth doing for an app that reads your bank messages</summary>
+
+<br>
+
+Every release ships a `.sha256` file next to the APK. Check the download matches:
+
+```bash
+sha256sum kaasu-1.0.0.apk        # compare with the value in the release notes
+```
+
+The APK is built by GitHub Actions from the tagged commit, so the run log shows exactly which
+source produced it. Nothing is uploaded from anyone's laptop.
+
+</details>
+
+### Option 2 — build it yourself
 
 ```bash
 git clone https://github.com/abdulhakeem19/kaasu.git
@@ -50,16 +78,19 @@ cd kaasu/kaasu-android
 ./gradlew installDebug
 ```
 
-Then on the phone:
+Needs JDK 17 and Android Studio. A real device is strongly recommended — notification and SMS
+capture can't be exercised on an emulator.
+
+### Then, on the phone
 
 | Step | What to do |
 |:---:|---|
-| **1** | Open Kaasu and finish onboarding |
-| **2** | Grant **notification access** when asked — this opens Android Settings, it isn't a normal popup |
-| **3** | *Optional:* grant SMS access, then **Settings → Re-scan SMS inbox** to pull in past messages |
-| **4** | *Optional:* enable the accessibility service to catch anything the first two missed |
+| **1** | Grant **notification access** when asked — this opens Android Settings, it isn't a normal popup |
+| **2** | *Optional:* grant SMS access, then **Settings → Re-scan SMS inbox** to pull in past messages |
+| **3** | *Optional:* enable the accessibility service to catch anything the first two missed |
+| **4** | *Optional:* **Settings → Re-scan saved transactions** to fill in anything captured earlier |
 
-> **Heads up:** notification and SMS capture can't be exercised on an emulator. Use a real device.
+> **Requires Android 8.0 (API 26) or later.**
 
 <details>
 <summary><b>Other useful commands</b></summary>
@@ -72,6 +103,8 @@ Then on the phone:
 ./gradlew assembleDebug        # build a debug APK
 ./gradlew connectedAndroidTest # instrumented tests (device required)
 ```
+
+Cutting a release? See [docs/RELEASING.md](docs/RELEASING.md).
 
 </details>
 
@@ -133,8 +166,12 @@ Full reasoning in [`PERMISSION_STRATEGY.md`](docs/PERMISSION_STRATEGY.md).
 
 > ### ℹ️ Kaasu is not on Google Play, and won't be
 > Google Play restricts SMS and Accessibility permissions to apps whose *core function* requires
-> them, and an expense tracker doesn't qualify. Kaasu is built to be installed on your own device
-> from source. If someone offers you a prebuilt Kaasu APK, don't trust it — see [SECURITY.md](SECURITY.md).
+> them, and an expense tracker doesn't qualify. That's why Kaasu is distributed as an APK here
+> instead.
+>
+> **Only install a Kaasu APK from [this repository's releases](../../releases).** An app with
+> notification, SMS and accessibility access is worth attacking, and a build from anywhere else
+> could contain anything. Check the published checksum — see [SECURITY.md](SECURITY.md).
 
 ---
 
