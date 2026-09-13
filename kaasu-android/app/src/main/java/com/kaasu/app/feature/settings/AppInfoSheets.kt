@@ -84,6 +84,7 @@ fun AboutDialog(onWhatsNew: () -> Unit, onClose: () -> Unit) {
         title = { Text("Kaasu", fontWeight = FontWeight.ExtraBold) },
         text = {
             Column {
+                Text("காசு · Tamil for money", fontSize = 13.sp, color = KaasuColors.forest)
                 Text("Version ${BuildConfig.VERSION_NAME}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(10.dp))
                 Text(

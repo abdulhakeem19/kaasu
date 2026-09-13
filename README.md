@@ -12,6 +12,8 @@ already receives — and keeps every rupee of it on your device.
 
 **No account. No cloud. No bank login. No ads.**
 
+<sub>*kaasu* · **காசு** · Tamil for money</sub>
+
 <br>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2ea44f?style=flat-square)](LICENSE)
@@ -239,6 +241,8 @@ Found a security or privacy issue? Please **don't** open a public issue — see 
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.png">
   <img src="docs/assets/logo.png" alt="" width="54">
 </picture>
+
+<sub>Built in Chennai 🇮🇳</sub>
 
 <sub>Kaasu is not affiliated with, endorsed by, or connected to any bank or payment provider.<br>
 Bank names and colours are used only to identify your own accounts inside the app.</sub>

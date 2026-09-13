@@ -15,6 +15,16 @@ Updated with each push-worthy commit. The goal is to always know the path we cam
 
 ---
 
+## [Phase 10: Name and origin] — 2026-09-13
+### Added
+- The README now says what the name means — *kaasu* · **காசு** · Tamil for money — directly under
+  the pitch, since it is the first thing a stranger wonders, and "Built in Chennai" in the footer.
+  The app already carried "Made in Chennai" in three places; the README carried neither.
+- Both About surfaces (Settings → About Kaasu, and the About dialog) now show "காசு · Tamil for
+  money" above the version.
+
+---
+
 ## [Phase 10: Releases — downloadable signed APK] — 2026-09-13
 ### Added
 - `.github/workflows/release.yml` — tagging `v*` builds, tests, signs and publishes a release APK
