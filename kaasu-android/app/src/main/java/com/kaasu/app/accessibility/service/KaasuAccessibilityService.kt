@@ -92,7 +92,11 @@ class KaasuAccessibilityService : AccessibilityService() {
                     val raw = candidate.toRawNotification()
                     // Coarse dedup: this channel only ever inserts what no other channel caught —
                     // see TransactionCapturePipeline.process's useCoarseDedup and DuplicateChecker.
-                    if (ep.transactionCapturePipeline().process(raw, useCoarseDedup = true)) {
+                    if (ep.transactionCapturePipeline().process(
+                            raw,
+                            useCoarseDedup = true,
+                            merchantOverride = candidate.merchantText,
+                    )) {
                         anyInserted = true
                     }
                 }

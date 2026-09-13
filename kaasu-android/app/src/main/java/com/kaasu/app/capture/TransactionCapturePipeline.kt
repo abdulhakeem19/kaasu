@@ -48,8 +48,17 @@ class TransactionCapturePipeline @Inject constructor(
     // WINDOW_MS match notification/SMS live capture rely on would almost never line up. That channel
     // also only ever inserts transactions no other channel caught (see DuplicateChecker), so a coarse
     // hit here means "drop it," never "merge/update."
-    suspend fun process(raw: RawNotification, useCoarseDedup: Boolean = false): Boolean {
+    suspend fun process(
+        raw: RawNotification,
+        useCoarseDedup: Boolean = false,
+        merchantOverride: String? = null,
+    ): Boolean {
         var parsed = transactionParser.parse(raw) ?: return false
+
+        // The screen-scrape channel reads the merchant straight off the row, so re-deriving it from
+        // a rebuilt sentence would only lose detail — MerchantParser caps a name at three words,
+        // which would clip "JAWAHAR NAGAR 70 FEET RD" to "JAWAHAR NAGAR 70".
+        merchantOverride?.trim()?.takeIf { it.isNotEmpty() }?.let { parsed = parsed.copy(merchantName = it) }
 
         // Apply a user-set merchant rename so this and future captures store the preferred name.
         parsed.merchantName?.let { parsedMerchant ->

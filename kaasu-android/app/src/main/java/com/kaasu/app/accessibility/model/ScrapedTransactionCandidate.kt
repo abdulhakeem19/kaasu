@@ -16,6 +16,8 @@ data class ScrapedTransactionCandidate(
     val dateText: String?,
     val directionHint: String?,
     val rawNodeText: String,
+    /** [rawNodeText] rewritten into the shape TransactionParser reads; null if none could be built. */
+    val canonicalText: String? = null,
     val sourcePackage: String,
     val scrapedAt: Long = System.currentTimeMillis()
 )
@@ -30,7 +32,9 @@ fun ScrapedTransactionCandidate.toRawNotification(): RawNotification {
         packageName = sourcePackage,
         appName = null,
         title = null,
-        text = rawNodeText,
+        // Prefer the canonical rewrite: the raw row text puts the merchant first with no verb,
+        // which every MerchantParser pattern misses.
+        text = canonicalText ?: rawNodeText,
         subText = null,
         postedAt = resolvedTimestamp
     )

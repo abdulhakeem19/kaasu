@@ -15,6 +15,40 @@ Updated with each push-worthy commit. The goal is to always know the path we cam
 
 ---
 
+## [Phase 11: Make the screen-reading channel actually capture] — 2026-09-14
+### Fixed
+- **The accessibility channel now reads what GPay actually exposes.** A device dump showed GPay
+  puts each history row in a single `contentDescription`, newline-separated — `"MERCHANT\n₹20
+  debited\n13 September"` — and exposes no `text` nodes and one view id. Three changes make that
+  readable:
+  - `collectLeafTexts` reads `contentDescription` as well as `text`, and takes a described node
+    whether or not it is a leaf, because the description sits on the row container.
+  - `isTransactionScreen` detects the *shape of the content* (an amount beside a direction word)
+    instead of matching view resource-ids. This is app-agnostic and immune to the id churn the old
+    approach was already trying to survive; the per-app `screenResourceIdHints` lists are gone.
+  - A `contentDescription` containing newlines is treated as one whole row rather than being fed
+    to the Y-coordinate row grouper, which exists to reassemble rows that arrive as siblings.
+- **`TransactionRowTextBuilder` now emits a canonical sentence.** Rows read "MERCHANT ₹20 debited
+  13 September" — merchant first, no verb — which every `MerchantParser` pattern misses since they
+  all key off one. Rewritten to "Paid to MERCHANT ₹20 on 13 September" (or "Received from …"), so
+  the existing parser handles a fourth input dialect without being taught one.
+- **Two real bugs in that builder, found by testing against the live format:**
+  - `AMOUNT_PATTERN` used `[₹Rs]` — a character class, so a bare "R" or "s" matched. "ARUN STORES
+    70 FEET RD" parsed as the amount "S 7". Now an alternation with word boundaries.
+  - `DATE_PATTERN`'s day-then-word branch accepted any word, so "₹20 debited" read as the date "20
+    debited" and "70 FEET" as a date inside the merchant. Now anchored on real month names, with a
+    coverage check so a date has to be most of its fragment.
+- The scraped merchant is passed to `TransactionCapturePipeline` as a `merchantOverride`. The row
+  gives it exactly; re-deriving it from the rebuilt sentence would clip it, since `MerchantParser`
+  caps a name at three words.
+
+### Added
+- Settings now shows a top-level **Screen reading** row with its real status. That health signal
+  existed but sat three taps deep inside Bank Sources, reading "never attempted" for the entire
+  life of the channel with nothing surfacing it.
+
+---
+
 ## [v1.0.2] — 2026-09-13
 ### Changed
 - Onboarding no longer asks for accessibility access as though it worked. v1.0.1 shipped a page

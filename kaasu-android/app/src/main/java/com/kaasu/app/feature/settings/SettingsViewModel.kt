@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.kaasu.app.accessibility.scraper.ScraperRegistry
 import com.kaasu.app.backfill.TransactionBackfillManager
 import com.kaasu.app.core.backup.BackupManager
 import com.kaasu.app.core.database.dao.AppSourceDao
@@ -42,6 +43,7 @@ class SettingsViewModel @Inject constructor(
     private val smsSenderDao: SmsSenderDao,
     private val backupManager: BackupManager,
     private val backfillManager: TransactionBackfillManager,
+    private val scraperRegistry: ScraperRegistry,
     private val csvExporter: CsvExporter,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
@@ -151,6 +153,24 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     // App sources (UPI/bank apps) for the Sources section
+    /**
+     * Whether the screen-reading channel has ever actually captured anything.
+     *
+     * This signal already existed per-app, three taps deep inside Bank Sources, and sat at "never
+     * attempted" for the entire life of the channel without anyone noticing. A capture channel
+     * that silently does nothing is the failure mode worth surfacing, so it is hoisted to the top
+     * level of Settings.
+     */
+    val screenReadingHealth = appSourceDao.getAll()
+        .map { sources ->
+            val scraped = sources.filter { it.packageName in scraperRegistry.supportedPackages }
+            ScreenReadingHealth(
+                lastSuccessAt = scraped.mapNotNull { it.lastAccessibilityScrapeSuccessAt }.maxOrNull(),
+                lastAttemptAt = scraped.mapNotNull { it.lastAccessibilityScrapeAttemptAt }.maxOrNull(),
+            )
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScreenReadingHealth())
+
     val appSources = appSourceDao.getAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
