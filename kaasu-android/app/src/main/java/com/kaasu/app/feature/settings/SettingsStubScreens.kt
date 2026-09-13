@@ -96,6 +96,11 @@ fun AboutScreen(onBack: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
+                    text = "காசு · Tamil for money",
+                    fontSize = 13.sp,
+                    color = KaasuColors.forest
+                )
+                Text(
                     text = "Version ${BuildConfig.VERSION_NAME}",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
