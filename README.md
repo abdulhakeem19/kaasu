@@ -1,96 +1,48 @@
 <div align="center">
 
-# Kaasu
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/banner-dark.png">
+  <img src="docs/assets/banner.png" alt="Kaasu — UPI Expense Tracker" width="420">
+</picture>
 
-**A privacy-first expense tracker for India that never asks for your bank login.**
+### Your phone already knows what you spent. Kaasu just writes it down.
 
-Kaasu reads the payment notifications and SMS your phone already receives, turns them into a
-spending log, and keeps every rupee of it on your device. No account. No cloud. No ads.
+A privacy-first expense tracker for India that reads the payment notifications and SMS your phone
+already receives — and keeps every rupee of it on your device.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-2ea44f.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-3ddc84.svg)](#requirements)
-[![Language](https://img.shields.io/badge/kotlin-100%25-7f52ff.svg)](https://kotlinlang.org)
-[![UI](https://img.shields.io/badge/UI-Jetpack%20Compose-4285f4.svg)](https://developer.android.com/jetpack/compose)
+**No account. No cloud. No bank login. No ads.**
+
+<br>
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-2ea44f?style=flat-square)](LICENSE)
+[![Android](https://img.shields.io/badge/Android-8.0%2B-3ddc84?style=flat-square&logo=android&logoColor=white)](#requirements)
+[![Kotlin](https://img.shields.io/badge/Kotlin-100%25-7f52ff?style=flat-square&logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![Compose](https://img.shields.io/badge/Jetpack%20Compose-4285f4?style=flat-square&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
+[![CI](https://img.shields.io/github/actions/workflow/status/abdulhakeem19/kaasu/android.yml?branch=main&style=flat-square&label=CI)](../../actions)
+
+[Quick start](#-quick-start) · [Features](#-what-it-does) · [Privacy](#-privacy-concretely) · [How it works](#️-how-it-works) · [Contributing](#-contributing)
 
 </div>
 
 ---
 
-## Why this exists
+## 🤔 Why this exists
 
-Every expense tracker in India asks you to do one of two things: type each purchase in by hand, or
-hand over your bank credentials to an aggregator. The first is work you will stop doing by week
-three. The second means your entire financial history lives on somebody else's server.
+Every expense tracker in India asks you to do one of two things:
 
-Your phone already knows. Every UPI payment, card swipe and bank debit arrives as a notification or
-an SMS. Kaasu reads those, on the device, and builds the log for you.
+1. **Type every purchase in by hand** — work you will quietly stop doing by week three.
+2. **Hand over your bank credentials** to an aggregator — your entire financial history, on someone
+   else's server, forever.
 
-**Nothing leaves your phone.** There is no server to leave it to.
+There's a third option nobody builds. Every UPI payment, card swipe and bank debit already arrives
+on your phone as a notification or an SMS. **Kaasu reads those, on the device, and builds the log
+for you.**
 
-## What it does
+Nothing leaves your phone — there is no server for it to leave to.
 
-| | |
-|---|---|
-| 🔔 **Four capture channels** | Notification listener, direct SMS, bank statement import (CSV/PDF/XLSX), and an optional passive accessibility reader — all feeding one pipeline |
-| 🏷️ **Learns your categories** | Categorise one "SWIGGY" by hand and every later one follows. Most-frequent wins, so a single misfiling can't re-teach the wrong category |
-| 🧾 **Reads the note you typed** | The "Bike repair" you typed while paying in GPay lands in the transaction |
-| 🔁 **Catches duplicates** | The same payment arriving by notification *and* SMS is stored once |
-| 🏦 **Knows your banks** | IDFC, SBI, Union Bank and friends get their own colour and monogram, consistently |
-| 📊 **Budgets and insights** | Monthly budgets per category, subscription detection, spending heatmap, CSV export |
-| 🔒 **App lock** | Biometric or PIN, with amounts hidden on the lock screen |
+---
 
-## Privacy, concretely
-
-This is the part most apps are vague about, so here it is in specifics:
-
-- **No network permission is used for your data.** Transactions are never uploaded, because there is
-  nowhere to upload them to.
-- **No analytics touch transaction content.** No spending data, merchant names or amounts are
-  reported anywhere.
-- **Raw notification and SMS text is never logged in release builds.**
-- **Deletion is real deletion** — a hard delete, not a flag, and you can wipe everything from
-  Settings.
-- **Money is stored as integer paise**, never floating point, so your totals don't drift.
-
-### About the permissions
-
-Kaasu asks for more than most trackers, and you should know exactly why before you grant anything:
-
-| Permission | What it's for | Required? |
-|---|---|---|
-| Notification access | Reads payment notifications — the primary capture channel | Yes |
-| `RECEIVE_SMS` / `READ_SMS` | Catches bank SMS for payments that send no notification | Optional |
-| Accessibility service | Passively reads GPay/PhonePe's *own* transaction-history screen to catch payments nothing else recorded | Optional, off by default |
-| `POST_NOTIFICATIONS` | Budget alerts | Optional |
-
-The accessibility channel is the most powerful permission class on Android, so it is deliberately
-the most conservative thing in the codebase: **purely passive** — it never taps, navigates or
-automates anything — scoped statically to payment-app packages and to window-change events only, so
-it cannot observe PIN entry or arbitrary keystrokes. See
-[`PERMISSION_STRATEGY.md`](docs/PERMISSION_STRATEGY.md) for the full reasoning.
-
-> **Note:** Kaasu is not distributed on Google Play. Google Play restricts SMS and Accessibility
-> permissions to apps whose *core function* requires them, and an expense tracker does not qualify.
-> Kaasu is built to be installed on your own device from source.
-
-## Screenshots
-
-> _Add screenshots to `docs/screenshots/` and link them here._
-
-| Dashboard | Transactions | Insights |
-|---|---|---|
-| _coming soon_ | _coming soon_ | _coming soon_ |
-
-## Getting started
-
-### Requirements
-
-- Android Studio (Ladybug or newer)
-- JDK 17
-- An Android device running **8.0 (API 26)** or later — a physical device is strongly recommended,
-  since notification and SMS capture cannot be exercised on an emulator
-
-### Build and install
+## 🚀 Quick start
 
 ```bash
 git clone https://github.com/abdulhakeem19/kaasu.git
@@ -98,69 +50,160 @@ cd kaasu/kaasu-android
 ./gradlew installDebug
 ```
 
-Then, on the device:
+Then on the phone:
 
-1. Open Kaasu and complete onboarding
-2. Grant **notification access** when prompted (this opens Android Settings — it is not a normal
-   runtime dialog)
-3. Optionally grant SMS access, and run **Settings → Re-scan SMS inbox** to import past messages
-4. Optionally enable the accessibility service
+| Step | What to do |
+|:---:|---|
+| **1** | Open Kaasu and finish onboarding |
+| **2** | Grant **notification access** when asked — this opens Android Settings, it isn't a normal popup |
+| **3** | *Optional:* grant SMS access, then **Settings → Re-scan SMS inbox** to pull in past messages |
+| **4** | *Optional:* enable the accessibility service to catch anything the first two missed |
 
-### Common commands
+> **Heads up:** notification and SMS capture can't be exercised on an emulator. Use a real device.
+
+<details>
+<summary><b>Other useful commands</b></summary>
+
+<br>
 
 ```bash
-./gradlew test              # unit tests
-./gradlew lint              # Android lint
-./gradlew assembleDebug     # build a debug APK
-./gradlew connectedAndroidTest   # instrumented tests (device required)
+./gradlew test                 # unit tests
+./gradlew lint                 # Android lint
+./gradlew assembleDebug        # build a debug APK
+./gradlew connectedAndroidTest # instrumented tests (device required)
 ```
 
-## How it works
+</details>
+
+---
+
+## ✨ What it does
+
+|   | Feature | |
+|:---:|---|---|
+| 🔔 | **Four ways to capture** | Notification listener, direct SMS, statement import (CSV/PDF/XLSX), and an optional passive screen reader — all feeding one pipeline |
+| 🏷️ | **Learns your categories** | Tag one "SWIGGY" by hand and every later one follows. Most-frequent wins, so one misfiling can't re-teach the wrong category |
+| 🧾 | **Keeps your note** | The "Bike repair" you typed while paying in GPay lands on the transaction |
+| 🔁 | **Kills duplicates** | The same payment arriving by notification *and* SMS is stored once |
+| 🏦 | **Knows your banks** | IDFC, SBI, Union Bank and friends get a consistent colour and monogram |
+| 📊 | **Budgets & insights** | Per-category budgets, subscription detection, a spending heatmap, CSV export |
+| 🌙 | **Light and dark** | A proper near-black dark theme, not an inverted light one |
+| 🔒 | **App lock** | Biometric or PIN, with amounts hidden on the lock screen |
+
+---
+
+## 📱 Screenshots
+
+> _Not published yet._ Screenshots of a real install show real merchants, real amounts and the names
+> of real people who sent money — so they can't simply be pasted in. Add sanitised captures to
+> `docs/screenshots/` and link them here.
+
+| Dashboard | Transactions | Insights |
+|:---:|:---:|:---:|
+| _coming soon_ | _coming soon_ | _coming soon_ |
+
+---
+
+## 🔐 Privacy, concretely
+
+Most apps are vague here, so this is specific:
+
+- 🚫 **Your data is never uploaded** — there is nowhere to upload it to.
+- 🚫 **No analytics touch transaction content.** No merchants, amounts or notes are reported anywhere.
+- 🚫 **Raw notification and SMS text is never logged in release builds.**
+- ✅ **Deletion is real deletion** — a hard delete, not a hidden flag. Wipe everything from Settings.
+- ✅ **Money is stored as integer paise**, never floating point, so totals don't drift.
+
+### The permissions, and why
+
+Kaasu asks for more than most trackers. You should know exactly why before granting anything:
+
+| Permission | Why | Required |
+|---|---|:---:|
+| **Notification access** | Reads payment notifications — the main capture channel | ✅ Yes |
+| **`RECEIVE_SMS` / `READ_SMS`** | Catches bank SMS for payments that send no notification | Optional |
+| **Accessibility service** | Passively reads GPay/PhonePe's *own* history screen to catch what nothing else saw | Optional, off by default |
+| **`POST_NOTIFICATIONS`** | Budget alerts | Optional |
+
+The accessibility channel is the most powerful permission class on Android, so it is deliberately
+the most conservative code in the project: **purely passive** — it never taps, navigates or
+automates anything — and scoped statically to payment-app packages and window-change events only,
+so it cannot observe PIN entry or arbitrary keystrokes.
+Full reasoning in [`PERMISSION_STRATEGY.md`](docs/PERMISSION_STRATEGY.md).
+
+> ### ℹ️ Kaasu is not on Google Play, and won't be
+> Google Play restricts SMS and Accessibility permissions to apps whose *core function* requires
+> them, and an expense tracker doesn't qualify. Kaasu is built to be installed on your own device
+> from source. If someone offers you a prebuilt Kaasu APK, don't trust it — see [SECURITY.md](SECURITY.md).
+
+---
+
+## 🏗️ How it works
 
 Every capture channel converges on one pipeline, so the parser, duplicate checker and categoriser
-exist in exactly one place:
+exist in exactly one place instead of once per channel:
 
 ```
-Notification ─┐
-SMS ──────────┤
-Statement ────┼─→ TransactionCapturePipeline
-Screen read ──┘         │
-                        ├─ TransactionParser      amount · type · merchant · note · confidence
-                        ├─ DuplicateChecker       same payment from two channels → stored once
-                        ├─ CategoryRuleEngine     explicit rules, then learned from your history
-                        └─ TransactionRepository  → Room (kaasu.db)
-                                  │
-                                  └─→ UseCase → ViewModel → Compose UI
+  Notification ─┐
+  SMS ──────────┤
+  Statement ────┼──▶  TransactionCapturePipeline
+  Screen read ──┘              │
+                               ├─▶ TransactionParser      amount · type · merchant · note · confidence
+                               ├─▶ DuplicateChecker       one payment, two channels → stored once
+                               ├─▶ CategoryRuleEngine     explicit rules, then learned from history
+                               └─▶ TransactionRepository  ──▶ Room (kaasu.db)
+                                              │
+                                              └──▶ UseCase ──▶ ViewModel ──▶ Compose UI
 ```
 
-**Stack:** Kotlin · Jetpack Compose · Material 3 · Room · DataStore · Hilt · Coroutines/Flow ·
-WorkManager
+**Built with** Kotlin · Jetpack Compose · Material 3 · Room · DataStore · Hilt · Coroutines & Flow · WorkManager
 
-Deeper detail lives in [`docs/`](docs/):
+<details>
+<summary><b>Where the details live</b></summary>
 
-- [`TECHNICAL_ARCHITECTURE.md`](docs/TECHNICAL_ARCHITECTURE.md) — layer design and the parser pipeline
-- [`DATABASE_SCHEMA.md`](docs/DATABASE_SCHEMA.md) — Room entities, field by field
-- [`PERMISSION_STRATEGY.md`](docs/PERMISSION_STRATEGY.md) — why each permission exists
-- [`ROADMAP.md`](docs/ROADMAP.md) — where this is going
-- [`CHANGELOG.md`](CHANGELOG.md) — every meaningful change since the first commit
+<br>
 
-## Contributing
+| Document | What's in it |
+|---|---|
+| [`TECHNICAL_ARCHITECTURE.md`](docs/TECHNICAL_ARCHITECTURE.md) | Layer design and the parser pipeline |
+| [`DATABASE_SCHEMA.md`](docs/DATABASE_SCHEMA.md) | Room entities, field by field |
+| [`PERMISSION_STRATEGY.md`](docs/PERMISSION_STRATEGY.md) | Why each permission exists |
+| [`ROADMAP.md`](docs/ROADMAP.md) | Where this is going |
+| [`CHANGELOG.md`](CHANGELOG.md) | Every meaningful change since the first commit |
 
-Contributions are welcome — especially **parser coverage for banks Kaasu doesn't handle yet**, which
-is the single highest-value thing you can add.
+</details>
 
-⚠️ **Never commit a real bank message.** Change the names, account tails and reference numbers
-before adding a test. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute a parser and what
-else is expected.
+---
 
-## Security
+## 🤝 Contributing
 
-Found a security or privacy issue? Please **don't** open a public issue — see
-[SECURITY.md](SECURITY.md).
+Contributions are welcome — **parser coverage for banks Kaasu doesn't handle yet** is the single
+highest-value thing you can add. Every bank words its messages differently, and Kaasu can only
+categorise what it can read.
 
-## License
+> ### ⚠️ Never commit a real bank message
+> A real SMS carries your account tail, a reference number, and often **another person's name**.
+> Change those before adding a test — keep only the bank's sentence structure, which is the only
+> part the parser reads.
+
+Start with [CONTRIBUTING.md](CONTRIBUTING.md) — it walks through adding a new bank step by step.
+
+Found a security or privacy issue? Please **don't** open a public issue — see [SECURITY.md](SECURITY.md).
+
+---
+
+## 📄 License
 
 [MIT](LICENSE) © 2026 Abdul Hakeem
 
-Kaasu is not affiliated with, endorsed by, or connected to any bank or payment provider. Bank names
-and colours are used only to identify your own accounts inside the app.
+<div align="center">
+<br>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.png">
+  <img src="docs/assets/logo.png" alt="" width="54">
+</picture>
+
+<sub>Kaasu is not affiliated with, endorsed by, or connected to any bank or payment provider.<br>
+Bank names and colours are used only to identify your own accounts inside the app.</sub>
+
+</div>
