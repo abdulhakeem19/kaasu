@@ -16,8 +16,6 @@ data class ScrapedTransactionCandidate(
     val dateText: String?,
     val directionHint: String?,
     val rawNodeText: String,
-    /** [rawNodeText] rewritten into the shape TransactionParser reads; null if none could be built. */
-    val canonicalText: String? = null,
     val sourcePackage: String,
     val scrapedAt: Long = System.currentTimeMillis()
 )
@@ -32,9 +30,12 @@ fun ScrapedTransactionCandidate.toRawNotification(): RawNotification {
         packageName = sourcePackage,
         appName = null,
         title = null,
-        // Prefer the canonical rewrite: the raw row text puts the merchant first with no verb,
-        // which every MerchantParser pattern misses.
-        text = canonicalText ?: rawNodeText,
+        // The row's own words, verbatim. An earlier version rewrote these into "Paid to X ₹20" so
+        // MerchantParser could read the name — but the merchant is passed separately as an override,
+        // and that prefix made every promotional row look like a receipt to PromotionalDetector,
+        // whose escape hatch treats "paid to" as proof a real payment happened. GPay's
+        // "Personal loan / Up to ₹40 lakh" offer was captured as a ₹40 expense because of it.
+        text = rawNodeText,
         subText = null,
         postedAt = resolvedTimestamp
     )

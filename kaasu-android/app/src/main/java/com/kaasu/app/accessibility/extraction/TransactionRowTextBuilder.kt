@@ -3,14 +3,6 @@ package com.kaasu.app.accessibility.extraction
 /** Pure result of reconstructing one transaction-history row from its on-screen text fragments. */
 data class ReconstructedRow(
     val sentence: String,
-    /**
-     * [sentence] rewritten into the shape `TransactionParser` already understands
-     * ("Paid to X ₹20 on 13 September"). Screen rows put the merchant first with no verb —
-     * "JAWAHAR NAGAR 70 FEET RD ₹20 debited 13 September" — which every `MerchantParser` pattern
-     * misses, since they all key off a verb. Null when the row had no merchant to anchor on, in
-     * which case callers fall back to [sentence].
-     */
-    val canonicalSentence: String?,
     val amountText: String?,
     val merchantText: String?,
     val dateText: String?,
@@ -42,8 +34,6 @@ object TransactionRowTextBuilder {
         "refund from", "cashback from"
     )
 
-    // Verbs that mean money arrived. Everything else in DIRECTION_VERBS means it left.
-    private val INBOUND_VERBS = setOf("received from", "credited", "refund from", "cashback from")
 
     /** A fragment counts as the date only if the match covers at least this much of it. */
     private const val DATE_COVERAGE_PERCENT = 60
@@ -101,21 +91,9 @@ object TransactionRowTextBuilder {
             fragment.substring(idx + verb.length).trim().ifBlank { null }
         } ?: cleaned.firstOrNull { it != amountFragment && it != dateFragment && it != directionFragment }
 
-        // "Paid to"/"Received from" are the two shapes MerchantParser and TransactionTypeParser
-        // both read cleanly, so canonicalising to one of them lets the existing parser do the work
-        // rather than teaching it a fourth input dialect.
-        val canonicalSentence = merchantText?.let { merchant ->
-            val verb = if (directionHint != null && directionHint in INBOUND_VERBS) "Received from" else "Paid to"
-            buildString {
-                append(verb).append(' ').append(merchant)
-                append(' ').append(amountText)
-                if (dateText != null) append(" on ").append(dateText)
-            }
-        }
 
         return ReconstructedRow(
             sentence = sentence,
-            canonicalSentence = canonicalSentence,
             amountText = amountText,
             merchantText = merchantText,
             dateText = dateText,

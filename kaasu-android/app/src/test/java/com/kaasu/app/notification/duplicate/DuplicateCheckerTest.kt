@@ -117,9 +117,22 @@ class DuplicateCheckerTest {
         assertFalse(checker.isDuplicateCoarse(parsed()))
     }
 
-    @Test fun notDuplicateCoarse_whenMerchantDiffers() = runTest {
-        fakeRepo.dateRangeResults = listOf(existing(merchant = "Zomato"))
-        assertFalse(checker.isDuplicateCoarse(parsed(merchant = "Swiggy")))
+    // Coarse dedup deliberately ignores the merchant, unlike the tight-window check. The same
+    // payment is named differently by different channels: the bank SMS names the account holder it
+    // paid, Google Pay names the shop. Requiring a merchant match let both be stored, doubling the
+    // spend — observed on a real device with one payment recorded as both "DHIVYA BHANU S" (SMS)
+    // and "KOORAI KADAI BIRYANI" (screen read).
+    @Test fun isDuplicateCoarse_evenWhenTheMerchantNameDiffersEntirely() = runTest {
+        fakeRepo.dateRangeResults = listOf(existing(merchant = "DHIVYA BHANU S"))
+        assertTrue(checker.isDuplicateCoarse(parsed(merchant = "KOORAI KADAI BIRYANI")))
+    }
+
+    // The cost of the above: a genuinely separate second payment of the same amount on the same day
+    // is discarded. Accepted knowingly — this channel only ever adds what nothing else caught, so a
+    // miss is recoverable while a double-count silently inflates every total.
+    @Test fun isDuplicateCoarse_alsoDropsAGenuineSecondPaymentOfTheSameAmountThatDay() = runTest {
+        fakeRepo.dateRangeResults = listOf(existing(merchant = "Tea Stall"))
+        assertTrue(checker.isDuplicateCoarse(parsed(merchant = "Tea Stall")))
     }
 
     @Test fun isDuplicateCoarse_caseInsensitivePartialMerchantMatch() = runTest {

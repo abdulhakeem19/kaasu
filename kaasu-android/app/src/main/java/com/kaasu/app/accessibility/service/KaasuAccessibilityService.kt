@@ -15,6 +15,8 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Fourth transaction-capture channel: opportunistically reads UPI apps' own on-screen
@@ -77,13 +79,32 @@ class KaasuAccessibilityService : AccessibilityService() {
     private fun handleEvent(pkg: String) {
         val ep = entryPoint
         val scraper = ep.scraperRegistry().resolve(pkg) ?: return
-        val root = rootInActiveWindow ?: return
+        val root = rootInActiveWindow ?: run {
+            if (BuildConfig.ENABLE_PARSER_LOGS) Log.d(TAG, "$pkg: no root window")
+            return
+        }
         try {
-            if (!scraper.isTransactionScreen(root)) return
+            // This channel's failure mode is silence — it shipped for weeks capturing nothing with
+            // nothing to show why. Debug-only breadcrumbs at each early return make that visible.
+            // ENABLE_PARSER_LOGS is false in release, so no captured text is ever logged there.
+            if (!scraper.isTransactionScreen(root)) {
+                if (BuildConfig.ENABLE_PARSER_LOGS) Log.d(TAG, "$pkg: not a transaction screen")
+                return
+            }
             val candidates = scraper.extractCandidates(root)
+            if (BuildConfig.ENABLE_PARSER_LOGS) Log.d(TAG, "$pkg: ${candidates.size} candidate rows")
             if (candidates.isEmpty()) return
 
             ep.applicationScope().launch {
+                // A single screen fires several typeWindowContentChanged events in a row, and each
+                // one used to start its own insert pass before any had committed — so DuplicateChecker
+                // saw nothing and the same three rows were stored three times. The mutex serialises
+                // the passes; the signature skips a screen whose rows have not changed since the last.
+                scrapeMutex.withLock {
+                val signature = candidates.joinToString("|") { it.rawNodeText }
+                if (signature == lastScrapeSignature) return@withLock
+                lastScrapeSignature = signature
+
                 val now = System.currentTimeMillis()
                 ep.appSourceDao().updateLastAccessibilityScrapeAttempt(pkg, now)
 
@@ -101,8 +122,12 @@ class KaasuAccessibilityService : AccessibilityService() {
                     }
                 }
 
+                if (BuildConfig.ENABLE_PARSER_LOGS) {
+                    Log.d(TAG, "$pkg: inserted=$anyInserted from ${candidates.size} candidates")
+                }
                 if (anyInserted) {
                     ep.appSourceDao().updateLastAccessibilityScrapeSuccess(pkg, System.currentTimeMillis())
+                }
                 }
             }
         } finally {
@@ -110,6 +135,12 @@ class KaasuAccessibilityService : AccessibilityService() {
             root.recycle()
         }
     }
+
+    private val scrapeMutex = Mutex()
+
+    /** Rows of the screen last processed, so an unchanged screen is not re-inserted. */
+    @Volatile
+    private var lastScrapeSignature: String? = null
 
     override fun onInterrupt() = Unit
 

@@ -1,11 +1,13 @@
 package com.kaasu.app.accessibility.extraction
 
 import com.kaasu.app.domain.model.TransactionType
+import com.kaasu.app.notification.filter.PromotionalDetector
 import com.kaasu.app.notification.parser.AmountParser
 import com.kaasu.app.notification.parser.TransactionTypeParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -30,28 +32,29 @@ class GPayRowFormatTest {
     }
 
     @Test
-    fun `debit row is canonicalised into a sentence the parser understands`() {
-        val r = row("ARUN STORES 70 FEET RD\n₹20 debited\n13 September")!!
-        assertEquals("Paid to ARUN STORES 70 FEET RD ₹20 on 13 September", r.canonicalSentence)
-    }
-
-    @Test
-    fun `credit row canonicalises to the inbound shape`() {
-        val r = row("MEENA R\n₹1,200 credited\n12 September")!!
-        assertEquals("Received from MEENA R ₹1,200 on 12 September", r.canonicalSentence)
-    }
-
-    @Test
-    fun `the canonical sentence drives the existing parsers correctly`() {
-        val canonical = row("KOORAI KADAI BIRYANI\n₹160 debited\n13 September")!!.canonicalSentence!!
-        assertEquals(16000L, AmountParser.parse(canonical))
-        assertEquals(TransactionType.EXPENSE, TransactionTypeParser.parse(canonical))
+    fun `the row's own words drive the existing parsers correctly`() {
+        // The row is fed to TransactionParser verbatim. It is not rewritten into a "Paid to X"
+        // sentence: the merchant travels separately as an override, and that prefix made every
+        // promotional row look like a receipt to PromotionalDetector.
+        val sentence = row("KOORAI KADAI BIRYANI\n₹160 debited\n13 September")!!.sentence
+        assertEquals(16000L, AmountParser.parse(sentence))
+        assertEquals(TransactionType.EXPENSE, TransactionTypeParser.parse(sentence))
     }
 
     @Test
     fun `an inbound row parses as income rather than expense`() {
-        val canonical = row("MEENA R\n₹1,200 credited\n12 September")!!.canonicalSentence!!
-        assertEquals(TransactionType.INCOME, TransactionTypeParser.parse(canonical))
+        val sentence = row("MEENA R\n₹1,200 credited\n12 September")!!.sentence
+        assertEquals(TransactionType.INCOME, TransactionTypeParser.parse(sentence))
+        assertEquals(120000L, AmountParser.parse(sentence))
+    }
+
+    @Test
+    fun `a promotional row is recognised as promotional, not as a payment`() {
+        // Regression: GPay lists offers in the same shape. This was captured as a ₹40 expense while
+        // the row was being rewritten with a "Paid to" prefix, which satisfied the detector's
+        // "a real receipt says paid to" escape hatch.
+        val sentence = row("Personal loan\nUp to ₹40 lakh, instant approval\nCheck details")!!.sentence
+        assertTrue(PromotionalDetector.isPromotional(sentence))
     }
 
     @Test

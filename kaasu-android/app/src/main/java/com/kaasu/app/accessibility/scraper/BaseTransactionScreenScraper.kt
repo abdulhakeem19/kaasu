@@ -50,7 +50,6 @@ abstract class BaseTransactionScreenScraper : ScreenScraper {
         return rows.mapNotNull { fragments ->
             val reconstructed = TransactionRowTextBuilder.build(fragments) ?: return@mapNotNull null
             ScrapedTransactionCandidate(
-                canonicalText = reconstructed.canonicalSentence,
                 amountText = reconstructed.amountText,
                 merchantText = reconstructed.merchantText,
                 dateText = reconstructed.dateText,

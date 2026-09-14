@@ -42,6 +42,29 @@ Updated with each push-worthy commit. The goal is to always know the path we cam
   gives it exactly; re-deriving it from the rebuilt sentence would clip it, since `MerchantParser`
   caps a name at three words.
 
+### Fixed (found by testing on a device, not by the unit tests)
+- **Self-duplicates.** One screen fires several `typeWindowContentChanged` events, and each started
+  its own insert pass before any had committed, so `DuplicateChecker` saw nothing and the same three
+  rows were stored three times. A mutex serialises the passes and a content signature skips a screen
+  whose rows have not changed.
+- **Promotional rows captured as payments.** GPay lists offers in the same row shape, and
+  "Personal loan / Up to ₹40 lakh" was stored as a ₹40 expense. The cause was the canonical rewrite
+  itself: prefixing "Paid to" satisfied `PromotionalDetector`'s escape hatch, which treats "paid to"
+  as proof a real payment happened. The rewrite is removed entirely — `merchantOverride` already
+  solved the problem it existed for, so the row's own words now reach the parser untouched.
+- **Cross-channel double-counting.** `isDuplicateCoarse` compared merchant names, but the same
+  payment is named differently by each channel: the bank SMS names the account holder
+  ("DHIVYA BHANU S") while GPay names the shop ("KOORAI KADAI BIRYANI"). Both were stored, doubling
+  the spend. Coarse dedup now matches on amount + direction + calendar day and ignores the name.
+
+### Known limitation
+- That dedup rule is deliberately conservative and currently over-corrects: two genuinely separate
+  payments of the same amount on the same day collapse into one. On the test device every scraped
+  row collided with an existing same-amount, same-day transaction, so the channel added nothing.
+  Erring this way is the right side for money — a double-count silently inflates every total — but
+  a count-based rule (compare how many rows exist for an amount/day against how many the screen
+  shows) would recover the real additions. Tracked in #17.
+
 ### Added
 - Settings now shows a top-level **Screen reading** row with its real status. That health signal
   existed but sat three taps deep inside Bank Sources, reading "never attempted" for the entire

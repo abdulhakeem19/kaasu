@@ -49,7 +49,18 @@ class DuplicateChecker @Inject constructor(
             amountInPaise = parsed.amountInPaise,
             type = parsed.type.name
         )
-        return candidates.any { existing -> MerchantSimilarity.areSimilar(existing.merchantName, parsed.merchantName) }
+        // Deliberately does NOT compare merchant names, unlike the tight-window check.
+        //
+        // The same payment is named differently by different channels: a bank SMS names the
+        // account holder it paid ("DHIVYA BHANU S") while Google Pay names the shop
+        // ("KOORAI KADAI BIRYANI"). MerchantSimilarity rightly says those are unrelated, so
+        // requiring a merchant match let both be stored and doubled the spend.
+        //
+        // Same amount, same direction, same calendar day is accepted as the same payment here.
+        // That can discard a genuinely separate second payment of the identical amount on the
+        // same day — but this channel exists only to add what no other channel caught, so missing
+        // one is the right side to err on. Double-counting silently inflates every total.
+        return candidates.isNotEmpty()
     }
 
     companion object {
