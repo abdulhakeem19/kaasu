@@ -43,5 +43,15 @@ object PendingPaymentDetector {
         "please pay",
         // Balance nudges that accompany the above
         "sufficient balance",
+        // Outcomes that mean no money moved. Google Pay lists these in the same row shape as a
+        // successful payment — "Payment to X chumma ₹10 Failed … Your money was not debited" was
+        // stored as a ₹10 expense.
+        "was not debited",
+        "money was not deducted",
+        "payment failed",
+        "transaction failed",
+        "failed •",
+        "pending •",
+        "cancelled •",
     )
 }

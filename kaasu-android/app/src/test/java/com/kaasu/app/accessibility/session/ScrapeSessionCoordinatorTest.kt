@@ -19,6 +19,7 @@ class ScrapeSessionCoordinatorTest {
         override suspend fun insert(
             raw: com.kaasu.app.notification.model.RawNotification,
             merchant: String?,
+            note: String?,
             coarseBudget: MutableMap<String, Int>,
         ): Boolean {
             if (refuseAll) return false
@@ -89,6 +90,7 @@ class ScrapeSessionCoordinatorTest {
             override suspend fun insert(
                 raw: com.kaasu.app.notification.model.RawNotification,
                 merchant: String?,
+                note: String?,
                 coarseBudget: MutableMap<String, Int>,
             ): Boolean { budgets += coarseBudget; return true }
         }

@@ -6,7 +6,9 @@ data class ReconstructedRow(
     val amountText: String?,
     val merchantText: String?,
     val dateText: String?,
-    val directionHint: String?
+    val directionHint: String?,
+    /** The free text the payer typed, when the row carries one. */
+    val noteText: String? = null,
 )
 
 /**
@@ -57,7 +59,14 @@ object TransactionRowTextBuilder {
      * to anchor on downstream, so the row isn't worth turning into a candidate at all.
      */
     fun build(fragments: List<String>): ReconstructedRow? {
-        val cleaned = fragments.map { it.trim() }.filter { it.isNotEmpty() }
+        // "•" separates fields visually in Google Pay's rows ("Paid • 1 Sept"). Leaving it joined
+        // meant the date match covered less than half its fragment and was discarded, so the row
+        // fell back to today's date — which is why history rows from the 1st and 5th were stored
+        // as if they happened today, and so escaped same-day duplicate detection entirely.
+        val cleaned = fragments
+            .flatMap { it.split('•', '·') }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
         if (cleaned.isEmpty()) return null
 
         val sentence = cleaned.joinToString(" ")
@@ -92,10 +101,37 @@ object TransactionRowTextBuilder {
         } ?: cleaned.firstOrNull { it != amountFragment && it != dateFragment && it != directionFragment }
 
 
+        // Google Pay's payment rows read "Payment to <contact> <note>" in one fragment — the note
+        // the payer typed is appended to the contact's name with nothing between them. Split on
+        // capitalisation: contact names arrive capitalised, typed notes do not ("Saraswathy gas",
+        // "Saraswathy trip balance amount"). Only applied to this "Payment to" shape, where the
+        // convention holds; elsewhere the whole fragment stays the merchant.
+        var resolvedMerchant = merchantText
+        var noteText: String? = null
+        val payeeFragment = cleaned.firstOrNull { it.startsWith("Payment to", ignoreCase = true) }
+        if (payeeFragment != null) {
+            // The row may arrive whole ("Payment to X note ₹20 Paid • 1 Sept") rather than split
+            // into fields, so the name and note end where the amount begins.
+            val afterVerb = payeeFragment.substring("Payment to".length)
+            val body = AMOUNT_PATTERN.find(afterVerb)
+                ?.let { afterVerb.substring(0, it.range.first) }
+                ?.trim()
+                ?: afterVerb.trim()
+            val words = body.split(' ').filter { it.isNotBlank() }
+            val noteStart = words.indexOfFirst { it.first().isLowerCase() }
+            if (noteStart > 0) {
+                resolvedMerchant = words.take(noteStart).joinToString(" ")
+                noteText = words.drop(noteStart).joinToString(" ").ifBlank { null }
+            } else if (body.isNotBlank()) {
+                resolvedMerchant = body
+            }
+        }
+
         return ReconstructedRow(
+            noteText = noteText,
             sentence = sentence,
             amountText = amountText,
-            merchantText = merchantText,
+            merchantText = resolvedMerchant,
             dateText = dateText,
             directionHint = directionHint
         )

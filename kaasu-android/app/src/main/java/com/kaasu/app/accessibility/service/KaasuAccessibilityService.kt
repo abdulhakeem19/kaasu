@@ -128,13 +128,14 @@ class KaasuAccessibilityService : AccessibilityService() {
     private val sessions = mutableMapOf<String, ScrapeSessionCoordinator>()
 
     private fun sessionFor(pkg: String): ScrapeSessionCoordinator = sessions.getOrPut(pkg) {
-        ScrapeSessionCoordinator(sink = { raw, merchant, budget ->
+        ScrapeSessionCoordinator(sink = { raw, merchant, note, budget ->
             // Coarse dedup: this channel only ever inserts what no other channel caught — see
             // TransactionCapturePipeline.process's useCoarseDedup and DuplicateChecker.
             entryPoint.transactionCapturePipeline().process(
                 raw,
                 useCoarseDedup = true,
                 merchantOverride = merchant,
+                noteOverride = note,
                 coarseBudget = budget,
             )
         })

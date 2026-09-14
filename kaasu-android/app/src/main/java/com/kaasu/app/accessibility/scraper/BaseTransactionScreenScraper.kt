@@ -54,6 +54,7 @@ abstract class BaseTransactionScreenScraper : ScreenScraper {
                 merchantText = reconstructed.merchantText,
                 dateText = reconstructed.dateText,
                 directionHint = reconstructed.directionHint,
+                noteText = reconstructed.noteText,
                 rawNodeText = reconstructed.sentence,
                 sourcePackage = packageName,
                 scrapedAt = now

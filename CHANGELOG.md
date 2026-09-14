@@ -15,6 +15,42 @@ Updated with each push-worthy commit. The goal is to always know the path we cam
 
 ---
 
+## [Phase 12: Capture correctness — duplicates, transfers, notes, failed payments] — 2026-09-14
+### Fixed
+- **Every bank SMS was being captured twice.** `SmsReceiver` reads the message directly, and the
+  notification listener separately read the messaging app's notification *about the same message*.
+  Neither duplicate check caught it: the notification text carries the sender header
+  ("AD-IDFCFB-S Your A/c…") so its hash differs, and it can arrive hours later, far outside the
+  five-minute window. On the owner's device one ₹150 payment was stored at 09:59 from
+  `sms:AD-IDFCFB-S` and again at 15:00 from `com.google.android.apps.messaging`. With `READ_SMS`
+  granted, messaging-app notifications are now dropped — `SmsReceiver` already has them. Without it
+  they still come through, since then they are the only sighting.
+- **Transfers between the owner's own accounts were stored as an expense plus an income**, inflating
+  both totals, with neither row saying where the money went. Each bank announces only its half:
+  IDFC says "A/c XX3956 debited", Union Bank says "A/c *0913 Credited". A debit and a credit of the
+  same amount landing on two different accounts within fifteen minutes are now linked, and both legs
+  read "IDFC FIRST → Union Bank".
+- **Failed payments were stored as spending.** Google Pay lists them in the same row shape as a
+  success — "Payment to X chumma ₹10 Failed … Your money was not debited" became a ₹10 expense.
+- **Screen-read rows were dated today instead of when they happened.** "•" separates fields in
+  those rows ("Paid • 1 Sept"); left joined, the date match covered less than half its fragment and
+  was discarded, so the row fell back to today — which is also why payments from the 1st, 5th, 9th
+  and 12th were re-added rather than recognised as already recorded.
+- **The typed note was lost and the merchant was garbage.** Rows read "Payment to Saraswathy gas",
+  with the note appended to the contact name. These now split on capitalisation — contact names
+  arrive capitalised, typed notes do not — so the merchant is "Saraswathy" and the note is "gas".
+  The note is carried through to storage rather than re-derived from the sentence.
+
+### Changed
+- **Backups and CSV exports now save to a file you choose** (`ACTION_CREATE_DOCUMENT`) instead of
+  only offering a share sheet. Sharing lists apps to send a file *to*; on a device with no
+  file-manager target there was no way to keep a copy at all, which makes a backup feature useless.
+  Filenames carry the date so successive exports do not overwrite each other.
+- `NotificationFilter` takes an injected `SmsCaptureAvailability` rather than a `Context`, so it
+  stays a plain unit-testable class with the Android permission lookup in its Hilt binding.
+
+---
+
 ## [v1.0.3] — 2026-09-14
 ### Added
 - The screen-reading capture channel now works. It reads Google Pay's own history screen for

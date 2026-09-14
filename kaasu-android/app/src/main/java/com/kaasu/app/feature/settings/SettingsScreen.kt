@@ -207,6 +207,17 @@ fun SettingsScreen(
         )
     }
 
+    // Save a backup to a location the owner picks. ACTION_CREATE_DOCUMENT, not a share sheet:
+    // sharing offers apps to send the file to, which on a device without a file-manager target
+    // leaves no way to actually keep the file.
+    val backupSaver = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> uri?.let { viewModel.backupDataTo(it) } }
+
+    val csvSaver = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri -> uri?.let { viewModel.exportCsvTo(it) } }
+
     // Restore: pick a backup .json file
     val restorePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -936,7 +947,7 @@ fun SettingsScreen(
                 icon = Icons.Default.Save,
                 label = "Back up data",
                 subtitle = "Save everything to a .json file",
-                onClick = { viewModel.backupData(context) },
+                onClick = { backupSaver.launch("kaasu-backup-${'$'}{todayStamp()}.json") },
                 isLast = false
             )
             IconSettingsRow(
@@ -949,7 +960,7 @@ fun SettingsScreen(
             IconSettingsRow(
                 icon = Icons.Default.Description,
                 label = "Export transactions (CSV)",
-                onClick = { viewModel.exportCsv(context) },
+                onClick = { csvSaver.launch("kaasu-transactions-${'$'}{todayStamp()}.csv") },
                 isLast = false
             )
             IconSettingsRow(
@@ -1522,3 +1533,8 @@ private fun relativeTimeShort(millis: Long): String {
         else -> "${minutes / (60 * 24)}d ago"
     }
 }
+
+
+/** Date stamp for exported filenames, so successive backups do not overwrite each other. */
+private fun todayStamp(): String =
+    java.time.LocalDate.now().toString()
