@@ -38,7 +38,16 @@ class DuplicateChecker @Inject constructor(
     // the same payment. Widens the match to a full calendar-day range instead, reusing the exact
     // same amount+type+merchant-similarity rule — same shape as StatementImportManager's Tier 2
     // same-day dedup, which solves the identical "coarse timestamp, need a day-wide match" problem.
-    suspend fun isDuplicateCoarse(parsed: ParsedTransaction): Boolean {
+    /**
+     * How many stored transactions already share this amount, direction and calendar day.
+     *
+     * A count rather than a yes/no, because the screen-scrape channel needs to know *how many* of
+     * the rows it can see are already accounted for. Names are deliberately not compared: each
+     * channel names the same payment differently — a bank SMS names the account holder it paid
+     * ("DHIVYA BHANU S"), Google Pay names the shop ("KOORAI KADAI BIRYANI") — so requiring a
+     * merchant match stored both and doubled the spend.
+     */
+    suspend fun countCoarseMatches(parsed: ParsedTransaction): Int {
         val zone = ZoneId.systemDefault()
         val date = Instant.ofEpochMilli(parsed.transactionTime).atZone(zone).toLocalDate()
         val startOfDay = date.atStartOfDay(zone).toInstant().toEpochMilli()
@@ -49,7 +58,7 @@ class DuplicateChecker @Inject constructor(
             amountInPaise = parsed.amountInPaise,
             type = parsed.type.name
         )
-        return candidates.any { existing -> MerchantSimilarity.areSimilar(existing.merchantName, parsed.merchantName) }
+        return candidates.size
     }
 
     companion object {

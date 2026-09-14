@@ -4,8 +4,8 @@ import android.accessibilityservice.AccessibilityService
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.kaasu.app.BuildConfig
-import com.kaasu.app.accessibility.model.toRawNotification
 import com.kaasu.app.accessibility.scraper.ScraperRegistry
+import com.kaasu.app.accessibility.session.ScrapeSessionCoordinator
 import com.kaasu.app.capture.TransactionCapturePipeline
 import com.kaasu.app.core.database.dao.AppSourceDao
 import com.kaasu.app.di.ApplicationScope
@@ -15,6 +15,8 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Fourth transaction-capture channel: opportunistically reads UPI apps' own on-screen
@@ -77,34 +79,65 @@ class KaasuAccessibilityService : AccessibilityService() {
     private fun handleEvent(pkg: String) {
         val ep = entryPoint
         val scraper = ep.scraperRegistry().resolve(pkg) ?: return
-        val root = rootInActiveWindow ?: return
+        val root = rootInActiveWindow ?: run {
+            if (BuildConfig.ENABLE_PARSER_LOGS) Log.d(TAG, "$pkg: no root window")
+            return
+        }
         try {
-            if (!scraper.isTransactionScreen(root)) return
+            // This channel's failure mode is silence — it shipped for weeks capturing nothing with
+            // nothing to show why. Debug-only breadcrumbs at each early return make that visible.
+            // ENABLE_PARSER_LOGS is false in release, so no captured text is ever logged there.
+            if (!scraper.isTransactionScreen(root)) {
+                if (BuildConfig.ENABLE_PARSER_LOGS) Log.d(TAG, "$pkg: not a transaction screen")
+                return
+            }
             val candidates = scraper.extractCandidates(root)
+            if (BuildConfig.ENABLE_PARSER_LOGS) Log.d(TAG, "$pkg: ${candidates.size} candidate rows")
             if (candidates.isEmpty()) return
 
             ep.applicationScope().launch {
+                // A single screen fires several typeWindowContentChanged events in a row, and each
+                // one used to start its own insert pass before any had committed — so DuplicateChecker
+                // saw nothing and the same three rows were stored three times. The mutex serialises
+                // the passes; the signature skips a screen whose rows have not changed since the last.
+                scrapeMutex.withLock {
                 val now = System.currentTimeMillis()
                 ep.appSourceDao().updateLastAccessibilityScrapeAttempt(pkg, now)
 
-                var anyInserted = false
-                for (candidate in candidates) {
-                    val raw = candidate.toRawNotification()
-                    // Coarse dedup: this channel only ever inserts what no other channel caught —
-                    // see TransactionCapturePipeline.process's useCoarseDedup and DuplicateChecker.
-                    if (ep.transactionCapturePipeline().process(raw, useCoarseDedup = true)) {
-                        anyInserted = true
-                    }
-                }
+                // Everything stateful lives in the coordinator, which spans the whole scrolling
+                // session rather than a single screen — see ScrapeSessionCoordinator.
+                val inserted = sessionFor(pkg).onScreen(candidates)
 
-                if (anyInserted) {
+                if (BuildConfig.ENABLE_PARSER_LOGS) {
+                    Log.d(TAG, "$pkg: inserted=$inserted of ${candidates.size} candidates")
+                }
+                if (inserted > 0) {
                     ep.appSourceDao().updateLastAccessibilityScrapeSuccess(pkg, System.currentTimeMillis())
+                }
                 }
             }
         } finally {
             @Suppress("DEPRECATION")
             root.recycle()
         }
+    }
+
+    private val scrapeMutex = Mutex()
+
+    /** One session per app, so scrolling GPay does not reset what was read from PhonePe. */
+    private val sessions = mutableMapOf<String, ScrapeSessionCoordinator>()
+
+    private fun sessionFor(pkg: String): ScrapeSessionCoordinator = sessions.getOrPut(pkg) {
+        ScrapeSessionCoordinator(sink = { raw, merchant, budget ->
+            // Coarse dedup: this channel only ever inserts what no other channel caught — see
+            // TransactionCapturePipeline.process's useCoarseDedup and DuplicateChecker.
+            entryPoint.transactionCapturePipeline().process(
+                raw,
+                useCoarseDedup = true,
+                merchantOverride = merchant,
+                coarseBudget = budget,
+            )
+        })
     }
 
     override fun onInterrupt() = Unit

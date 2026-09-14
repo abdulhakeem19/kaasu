@@ -22,32 +22,29 @@ import com.kaasu.app.accessibility.model.ScrapedTransactionCandidate
  */
 abstract class BaseTransactionScreenScraper : ScreenScraper {
 
-    /** Resource-id SUBSTRINGS (case-insensitive) that mark a screen as a transaction/history screen. */
-    protected abstract val screenResourceIdHints: List<String>
 
-    override fun isTransactionScreen(root: AccessibilityNodeInfo): Boolean =
-        containsMatchingResourceId(root, depth = 0)
-
-    private fun containsMatchingResourceId(node: AccessibilityNodeInfo, depth: Int): Boolean {
-        if (depth > MAX_SCREEN_CHECK_DEPTH) return false
-        val resId = node.viewIdResourceName
-        if (resId != null && screenResourceIdHints.any { resId.contains(it, ignoreCase = true) }) return true
-        for (i in 0 until node.childCount) {
-            val child = node.getChild(i) ?: continue
-            try {
-                if (containsMatchingResourceId(child, depth + 1)) return true
-            } finally {
-                @Suppress("DEPRECATION")
-                child.recycle()
-            }
-        }
-        return false
+    // Screen detection used to match view resource-ids. Measured against current Google Pay that
+    // can never pass: it exposes exactly one id to the accessibility tree (`android:id/content`).
+    // Detecting the *shape of the content* instead — an amount next to a direction word — is both
+    // app-agnostic and immune to the id churn the old approach was already trying to survive.
+    override fun isTransactionScreen(root: AccessibilityNodeInfo): Boolean {
+        val fragments = mutableListOf<Pair<Rect, String>>()
+        collectLeafTexts(root, depth = 0, out = fragments)
+        return fragments.any { (_, text) -> looksTransactional(text) }
     }
+
+    private fun looksTransactional(text: String): Boolean =
+        AMOUNT_HINT.containsMatchIn(text) && DIRECTION_HINT.containsMatchIn(text)
 
     override fun extractCandidates(root: AccessibilityNodeInfo): List<ScrapedTransactionCandidate> {
         val leaves = mutableListOf<Pair<Rect, String>>()
         collectLeafTexts(root, depth = 0, out = leaves)
-        val rows = groupIntoRows(leaves)
+
+        // A content description that already contains newlines IS a whole row — GPay packs
+        // "MERCHANT\n₹20 debited\n13 September" into one node. Splitting it beats feeding it to
+        // groupIntoRows, which exists to reassemble rows that arrived as separate sibling nodes.
+        val (packedRows, looseFragments) = leaves.partition { it.second.contains('\n') }
+        val rows = packedRows.map { (_, packed) -> packed.split('\n') } + groupIntoRows(looseFragments)
         val now = System.currentTimeMillis()
 
         return rows.mapNotNull { fragments ->
@@ -66,8 +63,17 @@ abstract class BaseTransactionScreenScraper : ScreenScraper {
 
     private fun collectLeafTexts(node: AccessibilityNodeInfo, depth: Int, out: MutableList<Pair<Rect, String>>) {
         if (depth > MAX_WALK_DEPTH || out.size >= MAX_COLLECTED_FRAGMENTS) return
+        // contentDescription first: Google Pay exposes no `text` at all on its history rows, only
+        // descriptions — reading `text` alone is why this channel captured nothing. A described
+        // node is taken whether or not it is a leaf, because the description sits on the row
+        // container while its children carry nothing.
+        val described = node.contentDescription?.toString()?.trim()
         val text = node.text?.toString()?.trim()
-        if (!text.isNullOrEmpty() && node.childCount == 0) {
+        if (!described.isNullOrEmpty()) {
+            val bounds = Rect()
+            node.getBoundsInScreen(bounds)
+            out += bounds to described
+        } else if (!text.isNullOrEmpty() && node.childCount == 0) {
             val bounds = Rect()
             node.getBoundsInScreen(bounds)
             out += bounds to text
@@ -110,5 +116,10 @@ abstract class BaseTransactionScreenScraper : ScreenScraper {
         const val MAX_WALK_DEPTH = 25
         const val MAX_COLLECTED_FRAGMENTS = 400
         const val ROW_Y_TOLERANCE_PX = 40
+        val AMOUNT_HINT = Regex("""[₹]|\bRs\.?\s?\d""", RegexOption.IGNORE_CASE)
+        val DIRECTION_HINT = Regex(
+            """\b(debited|credited|paid|sent|received|refund|cashback)\b""",
+            RegexOption.IGNORE_CASE
+        )
     }
 }

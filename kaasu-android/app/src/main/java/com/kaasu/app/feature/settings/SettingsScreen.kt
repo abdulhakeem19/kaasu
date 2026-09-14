@@ -81,6 +81,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.work.WorkInfo
 import com.kaasu.app.ui.theme.KaasuColors
 import com.kaasu.app.BuildConfig
+import com.kaasu.app.accessibility.AccessibilityServiceStatus
 import com.kaasu.app.core.database.entity.AppSourceEntity
 import com.kaasu.app.core.datastore.SettingsDataStore
 import com.kaasu.app.notification.filter.SourceApps
@@ -126,6 +127,7 @@ fun SettingsScreen(
     val smsSenders by viewModel.smsSenders.collectAsStateWithLifecycle()
     val smsBackfillWorkInfos by viewModel.smsBackfillWorkInfos.collectAsStateWithLifecycle()
     val isRescanning by viewModel.isRescanning.collectAsStateWithLifecycle()
+    val screenReadingHealth by viewModel.screenReadingHealth.collectAsStateWithLifecycle()
     val hideAmountsOnLock by viewModel.hideAmountsOnLock.collectAsStateWithLifecycle()
     val budgetAlertsOn by viewModel.budgetAlertsEnabled.collectAsStateWithLifecycle()
     val subscriptionRenewalsOn by viewModel.subscriptionRenewalsEnabled.collectAsStateWithLifecycle()
@@ -460,6 +462,28 @@ fun SettingsScreen(
                 label = "Accounts & cards",
                 subtitle = "Bank accounts and cards detected from your transactions",
                 onClick = onNavigateToAccounts,
+                isLast = false
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(horizontal = 14.dp))
+
+            // Hoisted from three taps deep inside Bank Sources. This signal read "never attempted"
+            // for the whole life of the screen-reading channel and nothing surfaced it — a capture
+            // channel that silently does nothing is exactly what deserves to be visible.
+            val screenReadingEnabled = AccessibilityServiceStatus.isEnabled(context)
+            SettingsRow(
+                label = "Screen reading",
+                subtitle = when {
+                    !screenReadingEnabled -> "Off — optional extra capture from GPay/PhonePe screens"
+                    screenReadingHealth.hasEverCaptured ->
+                        "On · last caught a payment ${relativeTimeShort(screenReadingHealth.lastSuccessAt!!)}"
+                    screenReadingHealth.hasEverAttempted ->
+                        "On · read a screen ${relativeTimeShort(screenReadingHealth.lastAttemptAt!!)}, nothing new"
+                    else -> "On · hasn't captured anything yet"
+                },
+                onClick = if (screenReadingEnabled) null else {
+                    { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+                },
                 isLast = true
             )
         }
@@ -1485,4 +1509,16 @@ private fun android.content.Context.sendSupportEmail(subject: String) {
         putExtra(Intent.EXTRA_TEXT, body)
     }
     runCatching { startActivity(intent) }
+}
+
+
+/** Compact "3 days ago" style label for the capture-health rows. */
+private fun relativeTimeShort(millis: Long): String {
+    val minutes = (System.currentTimeMillis() - millis) / 60_000
+    return when {
+        minutes < 1 -> "just now"
+        minutes < 60 -> "${minutes}m ago"
+        minutes < 60 * 24 -> "${minutes / 60}h ago"
+        else -> "${minutes / (60 * 24)}d ago"
+    }
 }

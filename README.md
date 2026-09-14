@@ -115,7 +115,7 @@ Cutting a release? See [docs/RELEASING.md](docs/RELEASING.md).
 
 |   | Feature | |
 |:---:|---|---|
-| 🔔 | **Three ways to capture** | Notification listener, direct SMS, and statement import (CSV/PDF/XLSX) — all feeding one pipeline |
+| 🔔 | **Four ways to capture** | Notification listener, direct SMS, statement import (CSV/PDF/XLSX), and an optional passive screen reader — all feeding one pipeline |
 | 🏷️ | **Learns your categories** | Tag one "SWIGGY" by hand and every later one follows. Most-frequent wins, so one misfiling can't re-teach the wrong category |
 | 🧾 | **Keeps your note** | The "Bike repair" you typed while paying in GPay lands on the transaction |
 | 🔁 | **Kills duplicates** | The same payment arriving by notification *and* SMS is stored once |
@@ -158,23 +158,19 @@ Kaasu asks for more than most trackers. You should know exactly why before grant
 |---|---|:---:|
 | **Notification access** | Reads payment notifications — the main capture channel | ✅ Yes |
 | **`RECEIVE_SMS` / `READ_SMS`** | Catches bank SMS for payments that send no notification | Optional |
-| **Accessibility service** | Experimental fourth channel. **Does not currently work** — see below. Leave it off | Off by default |
+| **Accessibility service** | Reads GPay's own history screen for payments the other channels missed | Optional, off by default |
 | **`POST_NOTIFICATIONS`** | Budget alerts | Optional |
 
-> ### ⚠️ The accessibility channel does not work — don't enable it
+> ### ℹ️ About the screen-reading channel
 >
-> It was built to read GPay/PhonePe's own transaction-history screen for payments the other
-> channels missed. Tested against current GPay, **it cannot capture anything**:
+> It reads Google Pay's own transaction-history screen for payments the other three channels never
+> saw, and it is **off by default** — the other three cover most of what you spend.
 >
-> - It decides a screen is a history screen by matching view resource-ids. GPay exposes exactly
->   one id to the accessibility tree (`android:id/content`), so that check can never pass.
-> - It reads text from `node.text`. GPay exposes **no** text nodes at all — its content lives in
->   `contentDescription`, which the scraper never reads.
-> - GPay sits behind a biometric lock a passive service cannot pass.
->
-> The code ships but the feature is dormant, and enabling it grants Android's most powerful
-> permission class for no benefit. Tracked as a known limitation rather than removed, since the
-> scope filter and parser reuse are worth keeping if the scraper can be made to work.
+> It only ever *adds*. Before storing a row it counts what is already recorded for that amount on
+> that day, and each stored transaction absorbs one row from the screen, so only a genuine surplus
+> is kept. That matters because each channel names the same payment differently — your bank's SMS
+> names the account holder it paid, Google Pay names the shop — so matching on names alone would
+> double-count every payment.
 
 When it *is* enabled, it is deliberately the most conservative code in the project: **purely
 passive** — it never taps, navigates or automates anything — and scoped statically to payment-app

@@ -30,6 +30,11 @@ fun ScrapedTransactionCandidate.toRawNotification(): RawNotification {
         packageName = sourcePackage,
         appName = null,
         title = null,
+        // The row's own words, verbatim. An earlier version rewrote these into "Paid to X ₹20" so
+        // MerchantParser could read the name — but the merchant is passed separately as an override,
+        // and that prefix made every promotional row look like a receipt to PromotionalDetector,
+        // whose escape hatch treats "paid to" as proof a real payment happened. GPay's
+        // "Personal loan / Up to ₹40 lakh" offer was captured as a ₹40 expense because of it.
         text = rawNodeText,
         subText = null,
         postedAt = resolvedTimestamp

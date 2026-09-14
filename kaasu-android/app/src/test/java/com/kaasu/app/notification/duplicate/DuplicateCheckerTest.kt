@@ -6,6 +6,7 @@ import com.kaasu.app.domain.repository.TransactionRepository
 import com.kaasu.app.notification.model.ParsedTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -109,34 +110,63 @@ class DuplicateCheckerTest {
 
     @Test fun isDuplicateCoarse_whenSameDayAmountTypeAndMerchant() = runTest {
         fakeRepo.dateRangeResults = listOf(existing(time = 500L))
-        assertTrue(checker.isDuplicateCoarse(parsed(time = 1000L)))
+        assertTrue(0 < checker.countCoarseMatches(parsed(time = 1000L)))
     }
 
     @Test fun notDuplicateCoarse_whenNoSameDayTransactions() = runTest {
         fakeRepo.dateRangeResults = emptyList()
-        assertFalse(checker.isDuplicateCoarse(parsed()))
+        assertEquals(0, checker.countCoarseMatches(parsed()))
     }
 
-    @Test fun notDuplicateCoarse_whenMerchantDiffers() = runTest {
-        fakeRepo.dateRangeResults = listOf(existing(merchant = "Zomato"))
-        assertFalse(checker.isDuplicateCoarse(parsed(merchant = "Swiggy")))
+    // The count is what lets the screen-scrape channel tell "already recorded" from "a second
+    // payment of the same amount today": existing rows absorb scraped rows one for one, and only
+    // the surplus is inserted. A boolean here collapsed both cases and rejected every row.
+    @Test fun countCoarseMatches_reportsHowManyRowsAlreadyCoverThatAmountAndDay() = runTest {
+        fakeRepo.dateRangeResults = listOf(
+            existing(merchant = "DHIVYA BHANU S"),
+            existing(merchant = "Tea Stall"),
+        )
+        assertEquals(2, checker.countCoarseMatches(parsed(merchant = "KOORAI KADAI BIRYANI")))
+    }
+
+    @Test fun countCoarseMatches_isZeroWhenNothingThatDayMatches() = runTest {
+        fakeRepo.dateRangeResults = emptyList()
+        assertEquals(0, checker.countCoarseMatches(parsed()))
+    }
+
+    // Coarse dedup deliberately ignores the merchant, unlike the tight-window check. The same
+    // payment is named differently by different channels: the bank SMS names the account holder it
+    // paid, Google Pay names the shop. Requiring a merchant match let both be stored, doubling the
+    // spend — observed on a real device with one payment recorded as both "DHIVYA BHANU S" (SMS)
+    // and "KOORAI KADAI BIRYANI" (screen read).
+    @Test fun isDuplicateCoarse_evenWhenTheMerchantNameDiffersEntirely() = runTest {
+        fakeRepo.dateRangeResults = listOf(existing(merchant = "DHIVYA BHANU S"))
+        assertTrue(0 < checker.countCoarseMatches(parsed(merchant = "KOORAI KADAI BIRYANI")))
+    }
+
+    // The cost of the above: a genuinely separate second payment of the same amount on the same day
+    // is discarded. Accepted knowingly — this channel only ever adds what nothing else caught, so a
+    // miss is recoverable while a double-count silently inflates every total.
+    @Test fun isDuplicateCoarse_alsoDropsAGenuineSecondPaymentOfTheSameAmountThatDay() = runTest {
+        fakeRepo.dateRangeResults = listOf(existing(merchant = "Tea Stall"))
+        assertTrue(0 < checker.countCoarseMatches(parsed(merchant = "Tea Stall")))
     }
 
     @Test fun isDuplicateCoarse_caseInsensitivePartialMerchantMatch() = runTest {
         fakeRepo.dateRangeResults = listOf(existing(merchant = "SWIGGY INDIA"))
-        assertTrue(checker.isDuplicateCoarse(parsed(merchant = "swiggy")))
+        assertTrue(0 < checker.countCoarseMatches(parsed(merchant = "swiggy")))
     }
 
     @Test fun isDuplicateCoarse_whenBothMerchantsAreNull() = runTest {
         fakeRepo.dateRangeResults = listOf(existing(merchant = null))
-        assertTrue(checker.isDuplicateCoarse(parsed(merchant = null)))
+        assertTrue(0 < checker.countCoarseMatches(parsed(merchant = null)))
     }
 
     @Test fun notDuplicateCoarse_ignoresIsDuplicateOnlyFakeData() = runTest {
         // isDuplicateCoarse must query the date-range lookup, not the tight-window one.
         fakeRepo.recentResults = listOf(existing())
         fakeRepo.dateRangeResults = emptyList()
-        assertFalse(checker.isDuplicateCoarse(parsed()))
+        assertEquals(0, checker.countCoarseMatches(parsed()))
     }
 
     // ── FakeTransactionRepository ─────────────────────────────────────────────

@@ -3,11 +3,10 @@ package com.kaasu.app.accessibility.scraper
 import javax.inject.Inject
 
 /**
- * PhonePe transaction-history screen scraper. `isTransactionScreen` matches defensively on
- * resource-id SUBSTRINGS rather than exact ids — PhonePe's exact view ids churn across app version
- * bumps, and a substring match survives most of that churn.
+ * PhonePe transaction-history scraper. All of the work lives in [BaseTransactionScreenScraper] —
+ * this exists only to bind a package name, since detection is now based on the shape of the
+ * on-screen content rather than per-app view ids.
  */
 class PhonePeScreenScraper @Inject constructor() : BaseTransactionScreenScraper() {
     override val packageName: String = "com.phonepe.app"
-    override val screenResourceIdHints = listOf("transaction", "txn", "history", "amount")
 }

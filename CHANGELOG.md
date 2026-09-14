@@ -15,6 +15,89 @@ Updated with each push-worthy commit. The goal is to always know the path we cam
 
 ---
 
+## [Phase 11: Make the screen-reading channel actually capture] — 2026-09-14
+### Fixed
+- **The accessibility channel now reads what GPay actually exposes.** A device dump showed GPay
+  puts each history row in a single `contentDescription`, newline-separated — `"MERCHANT\n₹20
+  debited\n13 September"` — and exposes no `text` nodes and one view id. Three changes make that
+  readable:
+  - `collectLeafTexts` reads `contentDescription` as well as `text`, and takes a described node
+    whether or not it is a leaf, because the description sits on the row container.
+  - `isTransactionScreen` detects the *shape of the content* (an amount beside a direction word)
+    instead of matching view resource-ids. This is app-agnostic and immune to the id churn the old
+    approach was already trying to survive; the per-app `screenResourceIdHints` lists are gone.
+  - A `contentDescription` containing newlines is treated as one whole row rather than being fed
+    to the Y-coordinate row grouper, which exists to reassemble rows that arrive as siblings.
+- **`TransactionRowTextBuilder` now emits a canonical sentence.** Rows read "MERCHANT ₹20 debited
+  13 September" — merchant first, no verb — which every `MerchantParser` pattern misses since they
+  all key off one. Rewritten to "Paid to MERCHANT ₹20 on 13 September" (or "Received from …"), so
+  the existing parser handles a fourth input dialect without being taught one.
+- **Two real bugs in that builder, found by testing against the live format:**
+  - `AMOUNT_PATTERN` used `[₹Rs]` — a character class, so a bare "R" or "s" matched. "ARUN STORES
+    70 FEET RD" parsed as the amount "S 7". Now an alternation with word boundaries.
+  - `DATE_PATTERN`'s day-then-word branch accepted any word, so "₹20 debited" read as the date "20
+    debited" and "70 FEET" as a date inside the merchant. Now anchored on real month names, with a
+    coverage check so a date has to be most of its fragment.
+- The scraped merchant is passed to `TransactionCapturePipeline` as a `merchantOverride`. The row
+  gives it exactly; re-deriving it from the rebuilt sentence would clip it, since `MerchantParser`
+  caps a name at three words.
+
+### Fixed (found by testing on a device, not by the unit tests)
+- **Self-duplicates.** One screen fires several `typeWindowContentChanged` events, and each started
+  its own insert pass before any had committed, so `DuplicateChecker` saw nothing and the same three
+  rows were stored three times. A mutex serialises the passes and a content signature skips a screen
+  whose rows have not changed.
+- **Promotional rows captured as payments.** GPay lists offers in the same row shape, and
+  "Personal loan / Up to ₹40 lakh" was stored as a ₹40 expense. The cause was the canonical rewrite
+  itself: prefixing "Paid to" satisfied `PromotionalDetector`'s escape hatch, which treats "paid to"
+  as proof a real payment happened. The rewrite is removed entirely — `merchantOverride` already
+  solved the problem it existed for, so the row's own words now reach the parser untouched.
+- **Cross-channel double-counting.** `isDuplicateCoarse` compared merchant names, but the same
+  payment is named differently by each channel: the bank SMS names the account holder
+  ("DHIVYA BHANU S") while GPay names the shop ("KOORAI KADAI BIRYANI"). Both were stored, doubling
+  the spend. Coarse dedup now matches on amount + direction + calendar day and ignores the name.
+
+### Changed
+- Coarse dedup counts rather than answers yes/no. `DuplicateChecker.countCoarseMatches` reports how
+  many stored rows already cover an amount on a day, and a per-scrape budget lets each of them
+  absorb exactly one row from the screen — so a day holding two ₹20 expenses against three on
+  screen yields one insert, not zero and not three. A boolean collapsed "already recorded" and
+  "a second payment of the same amount today" into the same answer and rejected everything.
+
+### Added
+- `ScrapeSessionCoordinator` — the state spanning one burst of screen reading, deliberately
+  Android-free so it can be tested directly. Every bug this channel had was found only by
+  installing the app and scrolling Google Pay by hand, because nothing could exercise the stateful
+  behaviour otherwise; six tests now cover exactly those cases in milliseconds.
+  - Rows are identified by their own text, so scrolling past a row already read does not store it
+    twice. This is what over-filled a deliberate one-row gap with three rows.
+  - The coarse budget spans the session rather than a single screen, so stored rows covering an
+    amount are counted once per sitting instead of per screen.
+  - A session ends after two idle minutes, separating "scrolling history" from "came back later" —
+    whether a row is a duplicate is then the database's call again, not a stale in-memory set's.
+  - A row with no merchant is skipped rather than stored unnamed. One such row reached the database
+    during device testing; an unnamed amount is worse than a miss, since the other three channels
+    would have caught a real payment anyway.
+- The service now delegates all of that to the coordinator, and the old signature guard is gone —
+  the per-row check subsumes it.
+
+### Verified on a device
+- A transaction was removed from the database to simulate one the other channels missed, then Google
+  Pay's history was opened. The channel inserted **exactly one** row — the surplus — and every
+  subsequent pass over the same screen inserted nothing. The build before the session coordinator
+  filled that same one-row gap with three rows.
+- On an untouched database, all eleven rows on screen were absorbed and nothing was stored, which
+  is the correct answer: every one already had a counterpart captured by SMS.
+- README and `PERMISSION_STRATEGY.md` no longer say the channel does not work, and the capture-channel
+  count goes back to four.
+
+### Added
+- Settings now shows a top-level **Screen reading** row with its real status. That health signal
+  existed but sat three taps deep inside Bank Sources, reading "never attempted" for the entire
+  life of the channel with nothing surfacing it.
+
+---
+
 ## [v1.0.2] — 2026-09-13
 ### Changed
 - Onboarding no longer asks for accessibility access as though it worked. v1.0.1 shipped a page
