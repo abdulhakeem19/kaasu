@@ -49,6 +49,4 @@ interface TransactionRepository {
     suspend fun delete(transaction: Transaction)
     suspend fun deleteById(id: Long)
     suspend fun deleteAll()
-    suspend fun getTotalSpendInPaise(startTime: Long, endTime: Long): Long
-    suspend fun getTotalIncomeInPaise(startTime: Long, endTime: Long): Long
 }
