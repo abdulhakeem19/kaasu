@@ -57,6 +57,41 @@ class SettingsViewModel @Inject constructor(
     private fun uriFor(context: Context, file: java.io.File): Uri =
         FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
 
+    /**
+     * Writes the backup into a file the owner picked via the system "save to files" dialog.
+     *
+     * Sharing was the only route out before, and a share sheet offers apps to send the file *to* —
+     * on a device with no file-manager target listed there is simply no way to keep a copy. A
+     * backup you cannot save anywhere is not a backup.
+     */
+    fun backupDataTo(uri: Uri) {
+        viewModelScope.launch {
+            runCatching {
+                val file = backupManager.exportToFile()
+                appContext.contentResolver.openOutputStream(uri)?.use { out ->
+                    file.inputStream().use { it.copyTo(out) }
+                } ?: error("Could not open the selected location")
+            }
+                .onSuccess { _message.emit("Backup saved") }
+                .onFailure { _message.emit("Backup failed: ${it.message}") }
+        }
+    }
+
+    fun exportCsvTo(uri: Uri) {
+        viewModelScope.launch {
+            runCatching {
+                val txns = transactionRepository.getAll().first()
+                val cats = categoryRepository.getAllActive().first().associateBy { it.id }
+                val file = csvExporter.export(txns, cats)
+                appContext.contentResolver.openOutputStream(uri)?.use { out ->
+                    file.inputStream().use { it.copyTo(out) }
+                } ?: error("Could not open the selected location")
+            }
+                .onSuccess { _message.emit("CSV saved") }
+                .onFailure { _message.emit("Export failed: ${it.message}") }
+        }
+    }
+
     fun backupData(context: Context) {
         viewModelScope.launch {
             runCatching { backupManager.exportToFile() }

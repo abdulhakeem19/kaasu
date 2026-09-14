@@ -8,6 +8,7 @@ import com.kaasu.app.core.util.Hashing
 import com.kaasu.app.domain.model.Account
 import com.kaasu.app.domain.model.AccountType
 import com.kaasu.app.domain.model.Transaction
+import com.kaasu.app.domain.model.TransactionType
 import com.kaasu.app.domain.repository.AccountRepository
 import com.kaasu.app.domain.repository.TransactionRepository
 import com.kaasu.app.notification.classifier.CategoryRuleEngine
@@ -16,6 +17,7 @@ import com.kaasu.app.notification.model.ParsedTransaction
 import com.kaasu.app.notification.model.RawNotification
 import com.kaasu.app.notification.parser.AccountNotificationParser
 import com.kaasu.app.notification.parser.TransactionParser
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
@@ -52,6 +54,7 @@ class TransactionCapturePipeline @Inject constructor(
         raw: RawNotification,
         useCoarseDedup: Boolean = false,
         merchantOverride: String? = null,
+        noteOverride: String? = null,
         coarseBudget: MutableMap<String, Int>? = null,
     ): Boolean {
         var parsed = transactionParser.parse(raw) ?: return false
@@ -60,6 +63,9 @@ class TransactionCapturePipeline @Inject constructor(
         // a rebuilt sentence would only lose detail — MerchantParser caps a name at three words,
         // which would clip "JAWAHAR NAGAR 70 FEET RD" to "JAWAHAR NAGAR 70".
         merchantOverride?.trim()?.takeIf { it.isNotEmpty() }?.let { parsed = parsed.copy(merchantName = it) }
+        // Same reasoning as the merchant: the row states the note outright, so re-deriving it from
+        // the sentence with NoteParser would only be a worse guess.
+        noteOverride?.trim()?.takeIf { it.isNotEmpty() }?.let { parsed = parsed.copy(note = it) }
 
         // Apply a user-set merchant rename so this and future captures store the preferred name.
         parsed.merchantName?.let { parsedMerchant ->
@@ -85,6 +91,11 @@ class TransactionCapturePipeline @Inject constructor(
 
         val accountId = resolveAccountId(parsed, appName, accountRepository, transactionRepository)
 
+        // A move between the owner's own accounts arrives as two unrelated messages — the sending
+        // bank's debit and the receiving bank's credit — and was stored as an expense plus an
+        // income, inflating both. Link them into one labelled transfer.
+        val transferLabel = linkInternalTransfer(parsed, accountId)
+
         val now = System.currentTimeMillis()
         val transaction = parsed.toTransaction(
             appName = appName,
@@ -92,7 +103,13 @@ class TransactionCapturePipeline @Inject constructor(
             categoryId = categoryId,
             accountId = accountId,
             now = now
-        )
+        ).let { tx ->
+            if (transferLabel != null) {
+                tx.copy(type = TransactionType.TRANSFER, isTransfer = true, merchantName = transferLabel)
+            } else {
+                tx
+            }
+        }
 
         if (BuildConfig.ENABLE_PARSER_LOGS) {
             android.util.Log.d(
@@ -134,6 +151,57 @@ class TransactionCapturePipeline @Inject constructor(
         if (remaining <= 0) return false
         budget[key] = remaining - 1
         return true
+    }
+
+    /**
+     * Detects a move between two of the owner's own accounts and labels both legs.
+     *
+     * Each bank announces only its own half: IDFC says "A/c XX3956 debited … hakeema188@okaxis
+     * credited", Union Bank says "A/c *0913 Credited for Rs:10.00". Nothing connects them, so the
+     * pair was stored as a ₹10 expense and a ₹10 income — both totals wrong, and neither row said
+     * where the money actually went.
+     *
+     * The signature of a transfer is a debit and a credit of the identical amount, landing on two
+     * different accounts of the owner's within [TRANSFER_WINDOW_MS]. When the second leg arrives,
+     * the first is rewritten too, so both read "IDFC FIRST → Union Bank".
+     *
+     * Returns that label for the incoming transaction, or null when this is an ordinary payment.
+     */
+    private suspend fun linkInternalTransfer(parsed: ParsedTransaction, accountId: Long?): String? {
+        if (accountId == null) return null
+        val counterpartType = when (parsed.type) {
+            TransactionType.EXPENSE -> TransactionType.INCOME
+            TransactionType.INCOME -> TransactionType.EXPENSE
+            else -> return null
+        }
+
+        val counterpart = transactionRepository.getRecentByAmountAndType(
+            amountInPaise = parsed.amountInPaise,
+            type = counterpartType.name,
+            since = parsed.transactionTime - TRANSFER_WINDOW_MS,
+        ).firstOrNull { it.accountId != null && it.accountId != accountId && !it.isTransfer }
+            ?: return null
+
+        val names = accountRepository.getAll().first().associate { it.id to it.displayName }
+        val thisName = names[accountId] ?: return null
+        val otherName = names[counterpart.accountId] ?: return null
+
+        // Direction reads from the money's point of view: whichever leg is the debit is the "from".
+        val label = if (parsed.type == TransactionType.EXPENSE) {
+            "$thisName → $otherName"
+        } else {
+            "$otherName → $thisName"
+        }
+
+        transactionRepository.update(
+            counterpart.copy(
+                type = TransactionType.TRANSFER,
+                isTransfer = true,
+                merchantName = label,
+                updatedAt = System.currentTimeMillis(),
+            )
+        )
+        return label
     }
 
     // Resolves which account a captured transaction belongs to, auto-creating one when a new
@@ -179,6 +247,9 @@ class TransactionCapturePipeline @Inject constructor(
 
     companion object {
         private const val TAG = "KaasuCapturePipeline"
+
+        /** Two banks announcing the same move rarely land more than a few minutes apart. */
+        private const val TRANSFER_WINDOW_MS = 15 * 60 * 1000L
 
         // Palette for auto-created accounts (deterministic per tail so colors stay stable).
         private val ACCOUNT_COLORS = listOf(

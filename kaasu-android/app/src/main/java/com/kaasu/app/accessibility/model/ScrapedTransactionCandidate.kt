@@ -15,6 +15,8 @@ data class ScrapedTransactionCandidate(
     val merchantText: String?,
     val dateText: String?,
     val directionHint: String?,
+    /** Free text the payer typed, read straight off the row. */
+    val noteText: String? = null,
     val rawNodeText: String,
     val sourcePackage: String,
     val scrapedAt: Long = System.currentTimeMillis()

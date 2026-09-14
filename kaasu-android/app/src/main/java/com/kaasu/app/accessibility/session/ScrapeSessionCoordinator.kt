@@ -10,6 +10,7 @@ fun interface ScrapedTransactionSink {
     suspend fun insert(
         raw: RawNotification,
         merchant: String?,
+        note: String?,
         coarseBudget: MutableMap<String, Int>,
     ): Boolean
 }
@@ -55,7 +56,7 @@ class ScrapeSessionCoordinator(
             val merchant = candidate.merchantText?.trim()
             if (merchant.isNullOrEmpty()) continue
 
-            if (sink.insert(candidate.toRawNotification(), merchant, coarseBudget)) inserted++
+            if (sink.insert(candidate.toRawNotification(), merchant, candidate.noteText, coarseBudget)) inserted++
         }
         return inserted
     }

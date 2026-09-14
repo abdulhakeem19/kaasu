@@ -16,11 +16,13 @@ import org.junit.Test
 class NotificationFilterTest {
 
     private lateinit var filter: NotificationFilter
+    private var smsGranted = false
 
     @Before
     fun setUp() {
         // No user-added bank sources; rely on the built-in allowlist.
-        filter = NotificationFilter(FakeAppSourceDao(), FakeIgnoredPatternDao())
+        // SMS access off by default here, so messaging notifications still come through.
+        filter = NotificationFilter(FakeAppSourceDao(), FakeIgnoredPatternDao()) { smsGranted }
     }
 
     private fun notif(pkg: String, text: String) =
