@@ -81,10 +81,15 @@ Updated with each push-worthy commit. The goal is to always know the path we cam
 - The service now delegates all of that to the coordinator, and the old signature guard is gone —
   the per-row check subsumes it.
 
-### Still unverified
-- The final device re-run could not be completed: the phone raised a credential prompt partway
-  through. The behaviour is covered by tests, but the surplus-insert path has not been confirmed
-  end to end since the coordinator landed.
+### Verified on a device
+- A transaction was removed from the database to simulate one the other channels missed, then Google
+  Pay's history was opened. The channel inserted **exactly one** row — the surplus — and every
+  subsequent pass over the same screen inserted nothing. The build before the session coordinator
+  filled that same one-row gap with three rows.
+- On an untouched database, all eleven rows on screen were absorbed and nothing was stored, which
+  is the correct answer: every one already had a counterpart captured by SMS.
+- README and `PERMISSION_STRATEGY.md` no longer say the channel does not work, and the capture-channel
+  count goes back to four.
 
 ### Added
 - Settings now shows a top-level **Screen reading** row with its real status. That health signal
