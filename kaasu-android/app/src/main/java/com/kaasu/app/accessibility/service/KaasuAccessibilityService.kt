@@ -108,6 +108,9 @@ class KaasuAccessibilityService : AccessibilityService() {
                 val now = System.currentTimeMillis()
                 ep.appSourceDao().updateLastAccessibilityScrapeAttempt(pkg, now)
 
+                // One tally per scrape pass: rows already stored for an amount on a day absorb the
+                // rows the screen shows for it, one each, so only a genuine surplus is inserted.
+                val coarseBudget = mutableMapOf<String, Int>()
                 var anyInserted = false
                 for (candidate in candidates) {
                     val raw = candidate.toRawNotification()
@@ -117,6 +120,7 @@ class KaasuAccessibilityService : AccessibilityService() {
                             raw,
                             useCoarseDedup = true,
                             merchantOverride = candidate.merchantText,
+                            coarseBudget = coarseBudget,
                     )) {
                         anyInserted = true
                     }

@@ -42,7 +42,7 @@ class TransactionCapturePipeline @Inject constructor(
     // Full pipeline: TransactionParser → DuplicateChecker → CategoryRuleEngine → TransactionRepository.insertParsed
     // Returns true if a transaction was inserted, false if dropped (unparseable or a duplicate).
     //
-    // [useCoarseDedup] selects DuplicateChecker.isDuplicateCoarse (full calendar-day window) instead
+    // [useCoarseDedup] selects DuplicateChecker.countCoarseMatches (full calendar-day window) instead
     // of the default tight-window isDuplicate. Only the accessibility screen-scrape channel passes
     // true — its scraped timestamps are date-only (see DateTextResolver's noon anchor), so the tight
     // WINDOW_MS match notification/SMS live capture rely on would almost never line up. That channel
@@ -52,6 +52,7 @@ class TransactionCapturePipeline @Inject constructor(
         raw: RawNotification,
         useCoarseDedup: Boolean = false,
         merchantOverride: String? = null,
+        coarseBudget: MutableMap<String, Int>? = null,
     ): Boolean {
         var parsed = transactionParser.parse(raw) ?: return false
 
@@ -68,7 +69,7 @@ class TransactionCapturePipeline @Inject constructor(
         }
 
         val isDuplicate = if (useCoarseDedup) {
-            duplicateChecker.isDuplicateCoarse(parsed)
+            isCoveredByExistingRows(parsed, coarseBudget)
         } else {
             duplicateChecker.isDuplicate(parsed)
         }
@@ -102,6 +103,33 @@ class TransactionCapturePipeline @Inject constructor(
         }
 
         transactionRepository.insertParsed(transaction, rawText = parsed.rawText)
+        return true
+    }
+
+    /**
+     * Coarse dedup for the screen-scrape channel, counted rather than boolean.
+     *
+     * A plain "does a same-amount, same-day row exist?" test collapses two genuinely separate
+     * payments of the same amount on one day into one, which on a real device rejected every row
+     * the screen showed. Instead each existing row absorbs exactly one scraped row: if the day
+     * already holds two ₹20 expenses and the screen shows three, the third is new and is inserted.
+     *
+     * [coarseBudget] carries that tally across one scrape pass; without it this degrades to the
+     * old all-or-nothing behaviour, which is the right default for a single stray call.
+     */
+    private suspend fun isCoveredByExistingRows(
+        parsed: ParsedTransaction,
+        budget: MutableMap<String, Int>?,
+    ): Boolean {
+        val key = "${parsed.amountInPaise}|${parsed.type.name}|" +
+            java.time.Instant.ofEpochMilli(parsed.transactionTime)
+                .atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+
+        if (budget == null) return duplicateChecker.countCoarseMatches(parsed) > 0
+
+        val remaining = budget.getOrPut(key) { duplicateChecker.countCoarseMatches(parsed) }
+        if (remaining <= 0) return false
+        budget[key] = remaining - 1
         return true
     }
 

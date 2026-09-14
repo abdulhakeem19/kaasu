@@ -57,13 +57,22 @@ Updated with each push-worthy commit. The goal is to always know the path we cam
   ("DHIVYA BHANU S") while GPay names the shop ("KOORAI KADAI BIRYANI"). Both were stored, doubling
   the spend. Coarse dedup now matches on amount + direction + calendar day and ignores the name.
 
-### Known limitation
-- That dedup rule is deliberately conservative and currently over-corrects: two genuinely separate
-  payments of the same amount on the same day collapse into one. On the test device every scraped
-  row collided with an existing same-amount, same-day transaction, so the channel added nothing.
-  Erring this way is the right side for money — a double-count silently inflates every total — but
-  a count-based rule (compare how many rows exist for an amount/day against how many the screen
-  shows) would recover the real additions. Tracked in #17.
+### Changed
+- Coarse dedup counts rather than answers yes/no. `DuplicateChecker.countCoarseMatches` reports how
+  many stored rows already cover an amount on a day, and a per-scrape budget lets each of them
+  absorb exactly one row from the screen — so a day holding two ₹20 expenses against three on
+  screen yields one insert, not zero and not three. A boolean collapsed "already recorded" and
+  "a second payment of the same amount today" into the same answer and rejected everything.
+
+### Known limitations — not finished
+- **Over-inserts across scroll positions.** Each scrape pass computes its own budget, and scrolling
+  produces several passes over overlapping rows. A deliberate one-row gap on the test device was
+  filled with three rows rather than one. The budget needs to span a scroll session, not a pass.
+- **A row was stored with an empty merchant**, so at least one candidate reaches the pipeline with
+  no usable name and no guard rejects it.
+- Verified so far: rows are read and parsed correctly, promotional rows are rejected, self-
+  duplicates are gone, and where every screen row already had a counterpart nothing was inserted —
+  which is the correct answer. The surplus path does insert, but not yet the right number.
 
 ### Added
 - Settings now shows a top-level **Screen reading** row with its real status. That health signal
