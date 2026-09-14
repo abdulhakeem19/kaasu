@@ -175,17 +175,7 @@ interface TransactionDao {
     """)
     fun search(query: String): Flow<List<TransactionEntity>>
 
-    @Query("""
-        SELECT COALESCE(SUM(amountInPaise), 0) FROM transactions
-        WHERE type = 'EXPENSE' AND transactionTime BETWEEN :startTime AND :endTime AND isIgnored = 0
-    """)
-    suspend fun getTotalSpendInPaise(startTime: Long, endTime: Long): Long
 
-    @Query("""
-        SELECT COALESCE(SUM(amountInPaise), 0) FROM transactions
-        WHERE type = 'INCOME' AND transactionTime BETWEEN :startTime AND :endTime AND isIgnored = 0
-    """)
-    suspend fun getTotalIncomeInPaise(startTime: Long, endTime: Long): Long
 
     // Called by DeleteAllDataUseCase — hard delete per privacy policy
     @Query("DELETE FROM transactions")

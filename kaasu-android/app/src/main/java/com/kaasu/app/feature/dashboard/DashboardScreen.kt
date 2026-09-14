@@ -443,12 +443,16 @@ private fun StatCard(
 private fun Sparkline(points: List<Long>, modifier: Modifier = Modifier) {
     // Canvas draws inside a DrawScope, which is not composition, so the palette is read out here.
     val strokeColor = KaasuColors.forest
-    val max = (points.maxOrNull() ?: 0L).coerceAtLeast(1L)
+    // A day whose refunds outweighed its spending nets below zero. That is a true figure and the
+    // "This week" total keeps it, but a line has nowhere below the baseline to go, so it is
+    // flattened here at the point of drawing rather than in the state.
+    val drawn = points.map { it.coerceAtLeast(0L) }
+    val max = (drawn.maxOrNull() ?: 0L).coerceAtLeast(1L)
     Canvas(modifier = modifier) {
-        if (points.size < 2) return@Canvas
-        val stepX = size.width / (points.size - 1)
+        if (drawn.size < 2) return@Canvas
+        val stepX = size.width / (drawn.size - 1)
         val path = Path()
-        points.forEachIndexed { i, v ->
+        drawn.forEachIndexed { i, v ->
             val x = stepX * i
             val y = size.height - (v.toFloat() / max) * size.height
             if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)

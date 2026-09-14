@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kaasu.app.domain.money.SpendRules
 import com.kaasu.app.ui.theme.KaasuColors
 import com.kaasu.app.core.util.formatRupees
 import com.kaasu.app.domain.model.TransactionType
@@ -233,10 +234,10 @@ fun TransactionsScreen(
                     stickyHeader(key = group.dateLabel) {
                         DayGroupHeader(
                             label = group.dateLabel,
+                            // Outflow, not spend: this header totals what left the account that
+                            // day, so a transfer out belongs here even though it is not spending.
                             dailyTotalPaise = group.transactions.sumOf { tx ->
-                                if (tx.type == TransactionType.EXPENSE ||
-                                    tx.type == TransactionType.TRANSFER
-                                ) tx.amountInPaise else 0L
+                                if (SpendRules.isOutflow(tx)) tx.amountInPaise else 0L
                             }
                         )
                     }

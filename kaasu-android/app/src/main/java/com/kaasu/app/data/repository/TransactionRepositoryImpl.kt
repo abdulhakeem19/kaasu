@@ -117,11 +117,7 @@ class TransactionRepositoryImpl @Inject constructor(
     override suspend fun deleteById(id: Long) =
         dao.deleteById(id)
 
-    override suspend fun getTotalSpendInPaise(startTime: Long, endTime: Long): Long =
-        dao.getTotalSpendInPaise(startTime, endTime)
 
-    override suspend fun getTotalIncomeInPaise(startTime: Long, endTime: Long): Long =
-        dao.getTotalIncomeInPaise(startTime, endTime)
 
     override suspend fun deleteAll() = dao.deleteAll()
 }

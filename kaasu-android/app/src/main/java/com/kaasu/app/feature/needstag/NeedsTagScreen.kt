@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kaasu.app.domain.money.SpendRules
 import com.kaasu.app.ui.theme.KaasuColors
 import com.kaasu.app.core.util.formatRupees
 import com.kaasu.app.core.util.toComposeColor
@@ -115,7 +116,7 @@ fun NeedsTagScreen(
                     merchant = item.transaction.merchantName ?: "Unknown",
                     subtitle = subtitleFor(item.transaction),
                     amountLabel = amountLabel(item.transaction),
-                    isExpense = item.transaction.type == TransactionType.EXPENSE || item.transaction.type == TransactionType.TRANSFER,
+                    isExpense = SpendRules.isOutflow(item.transaction),
                     suggestedCategory = item.suggestedCategoryId?.let { state.categoryMap[it] },
                     categories = state.categories,
                     always = alwaysFlags[item.transaction.id] ?: true,
@@ -298,7 +299,7 @@ private fun subtitleFor(tx: com.kaasu.app.domain.model.Transaction): String {
 }
 
 private fun amountLabel(tx: com.kaasu.app.domain.model.Transaction): String {
-    val sign = if (tx.type == TransactionType.EXPENSE || tx.type == TransactionType.TRANSFER) "−₹" else "+₹"
+    val sign = if (SpendRules.isOutflow(tx)) "−₹" else "+₹"
     return "$sign${tx.amountInPaise.formatRupees().removePrefix("₹")}"
 }
 
