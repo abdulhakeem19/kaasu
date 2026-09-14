@@ -2,6 +2,7 @@ package com.kaasu.app.feature.budgets
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kaasu.app.domain.money.SpendRules
 import com.kaasu.app.core.datastore.SettingsDataStore
 import com.kaasu.app.core.util.BudgetCycle
 import com.kaasu.app.domain.model.Category
@@ -85,7 +86,7 @@ class BudgetsViewModel @Inject constructor(
         cycle: BudgetCycle
     ): BudgetsUiState {
         val expenses = transactions.filter {
-            it.type == TransactionType.EXPENSE || it.type == TransactionType.TRANSFER
+            SpendRules.isSpend(it)
         }
         val overallSpent = expenses.sumOf { it.amountInPaise }
 

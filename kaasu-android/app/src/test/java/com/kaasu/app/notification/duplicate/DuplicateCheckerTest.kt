@@ -211,8 +211,6 @@ class DuplicateCheckerTest {
         override suspend fun update(t: Transaction) = Unit
         override suspend fun delete(t: Transaction) = Unit
         override suspend fun deleteById(id: Long) = Unit
-        override suspend fun getTotalSpendInPaise(s: Long, e: Long): Long = 0L
-        override suspend fun getTotalIncomeInPaise(s: Long, e: Long): Long = 0L
         override suspend fun deleteAll() = Unit
     }
 }

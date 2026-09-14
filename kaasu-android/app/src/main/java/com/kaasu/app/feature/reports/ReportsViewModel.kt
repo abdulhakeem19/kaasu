@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kaasu.app.domain.money.SpendRules
 import com.kaasu.app.core.export.CsvExporter
 import com.kaasu.app.domain.model.Category
 import com.kaasu.app.domain.model.Transaction
@@ -114,12 +115,12 @@ class ReportsViewModel @Inject constructor(
         }
 
         val expenses = monthTransactions.filter {
-            it.type == TransactionType.EXPENSE || it.type == TransactionType.TRANSFER
+            SpendRules.isSpend(it)
         }
         val income = monthTransactions.filter {
-            it.type == TransactionType.INCOME ||
-            it.type == TransactionType.CASHBACK ||
-            it.type == TransactionType.REFUND
+            // Refunds and cashback are no longer income: counting money back as earnings
+            // overstated both sides of the month. They reduce spend instead — see SpendRules.
+            SpendRules.isIncome(it)
         }
 
         val categoryBreakdown = expenses
@@ -139,7 +140,7 @@ class ReportsViewModel @Inject constructor(
             val (s, e) = m.toMilliRange()
             val spent = allTransactions
                 .filter { it.transactionTime in s..e }
-                .filter { it.type == TransactionType.EXPENSE || it.type == TransactionType.TRANSFER }
+                .filter(SpendRules::isSpend)
                 .sumOf { it.amountInPaise }
             MonthlyTotal(
                 label = m.month.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
