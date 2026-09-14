@@ -15,6 +15,13 @@ Updated with each push-worthy commit. The goal is to always know the path we cam
 
 ---
 
+## [v1.0.3] — 2026-09-14
+### Added
+- The screen-reading capture channel now works. It reads Google Pay's own history screen for
+  payments the other three channels missed, adds only a genuine surplus, and stays off by default.
+
+---
+
 ## [Phase 11: Make the screen-reading channel actually capture] — 2026-09-14
 ### Fixed
 - **The accessibility channel now reads what GPay actually exposes.** A device dump showed GPay
