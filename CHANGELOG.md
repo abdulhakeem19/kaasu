@@ -64,15 +64,27 @@ Updated with each push-worthy commit. The goal is to always know the path we cam
   screen yields one insert, not zero and not three. A boolean collapsed "already recorded" and
   "a second payment of the same amount today" into the same answer and rejected everything.
 
-### Known limitations — not finished
-- **Over-inserts across scroll positions.** Each scrape pass computes its own budget, and scrolling
-  produces several passes over overlapping rows. A deliberate one-row gap on the test device was
-  filled with three rows rather than one. The budget needs to span a scroll session, not a pass.
-- **A row was stored with an empty merchant**, so at least one candidate reaches the pipeline with
-  no usable name and no guard rejects it.
-- Verified so far: rows are read and parsed correctly, promotional rows are rejected, self-
-  duplicates are gone, and where every screen row already had a counterpart nothing was inserted —
-  which is the correct answer. The surplus path does insert, but not yet the right number.
+### Added
+- `ScrapeSessionCoordinator` — the state spanning one burst of screen reading, deliberately
+  Android-free so it can be tested directly. Every bug this channel had was found only by
+  installing the app and scrolling Google Pay by hand, because nothing could exercise the stateful
+  behaviour otherwise; six tests now cover exactly those cases in milliseconds.
+  - Rows are identified by their own text, so scrolling past a row already read does not store it
+    twice. This is what over-filled a deliberate one-row gap with three rows.
+  - The coarse budget spans the session rather than a single screen, so stored rows covering an
+    amount are counted once per sitting instead of per screen.
+  - A session ends after two idle minutes, separating "scrolling history" from "came back later" —
+    whether a row is a duplicate is then the database's call again, not a stale in-memory set's.
+  - A row with no merchant is skipped rather than stored unnamed. One such row reached the database
+    during device testing; an unnamed amount is worse than a miss, since the other three channels
+    would have caught a real payment anyway.
+- The service now delegates all of that to the coordinator, and the old signature guard is gone —
+  the per-row check subsumes it.
+
+### Still unverified
+- The final device re-run could not be completed: the phone raised a credential prompt partway
+  through. The behaviour is covered by tests, but the surplus-insert path has not been confirmed
+  end to end since the coordinator landed.
 
 ### Added
 - Settings now shows a top-level **Screen reading** row with its real status. That health signal

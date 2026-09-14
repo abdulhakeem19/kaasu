@@ -128,6 +128,9 @@ class TransactionCapturePipeline @Inject constructor(
         if (budget == null) return duplicateChecker.countCoarseMatches(parsed) > 0
 
         val remaining = budget.getOrPut(key) { duplicateChecker.countCoarseMatches(parsed) }
+        if (BuildConfig.ENABLE_PARSER_LOGS) {
+            android.util.Log.d(TAG, "coarse key=$key remaining=$remaining merchant=${parsed.merchantName}")
+        }
         if (remaining <= 0) return false
         budget[key] = remaining - 1
         return true

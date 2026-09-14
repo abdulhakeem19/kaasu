@@ -4,8 +4,8 @@ import android.accessibilityservice.AccessibilityService
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.kaasu.app.BuildConfig
-import com.kaasu.app.accessibility.model.toRawNotification
 import com.kaasu.app.accessibility.scraper.ScraperRegistry
+import com.kaasu.app.accessibility.session.ScrapeSessionCoordinator
 import com.kaasu.app.capture.TransactionCapturePipeline
 import com.kaasu.app.core.database.dao.AppSourceDao
 import com.kaasu.app.di.ApplicationScope
@@ -101,35 +101,17 @@ class KaasuAccessibilityService : AccessibilityService() {
                 // saw nothing and the same three rows were stored three times. The mutex serialises
                 // the passes; the signature skips a screen whose rows have not changed since the last.
                 scrapeMutex.withLock {
-                val signature = candidates.joinToString("|") { it.rawNodeText }
-                if (signature == lastScrapeSignature) return@withLock
-                lastScrapeSignature = signature
-
                 val now = System.currentTimeMillis()
                 ep.appSourceDao().updateLastAccessibilityScrapeAttempt(pkg, now)
 
-                // One tally per scrape pass: rows already stored for an amount on a day absorb the
-                // rows the screen shows for it, one each, so only a genuine surplus is inserted.
-                val coarseBudget = mutableMapOf<String, Int>()
-                var anyInserted = false
-                for (candidate in candidates) {
-                    val raw = candidate.toRawNotification()
-                    // Coarse dedup: this channel only ever inserts what no other channel caught —
-                    // see TransactionCapturePipeline.process's useCoarseDedup and DuplicateChecker.
-                    if (ep.transactionCapturePipeline().process(
-                            raw,
-                            useCoarseDedup = true,
-                            merchantOverride = candidate.merchantText,
-                            coarseBudget = coarseBudget,
-                    )) {
-                        anyInserted = true
-                    }
-                }
+                // Everything stateful lives in the coordinator, which spans the whole scrolling
+                // session rather than a single screen — see ScrapeSessionCoordinator.
+                val inserted = sessionFor(pkg).onScreen(candidates)
 
                 if (BuildConfig.ENABLE_PARSER_LOGS) {
-                    Log.d(TAG, "$pkg: inserted=$anyInserted from ${candidates.size} candidates")
+                    Log.d(TAG, "$pkg: inserted=$inserted of ${candidates.size} candidates")
                 }
-                if (anyInserted) {
+                if (inserted > 0) {
                     ep.appSourceDao().updateLastAccessibilityScrapeSuccess(pkg, System.currentTimeMillis())
                 }
                 }
@@ -142,9 +124,21 @@ class KaasuAccessibilityService : AccessibilityService() {
 
     private val scrapeMutex = Mutex()
 
-    /** Rows of the screen last processed, so an unchanged screen is not re-inserted. */
-    @Volatile
-    private var lastScrapeSignature: String? = null
+    /** One session per app, so scrolling GPay does not reset what was read from PhonePe. */
+    private val sessions = mutableMapOf<String, ScrapeSessionCoordinator>()
+
+    private fun sessionFor(pkg: String): ScrapeSessionCoordinator = sessions.getOrPut(pkg) {
+        ScrapeSessionCoordinator(sink = { raw, merchant, budget ->
+            // Coarse dedup: this channel only ever inserts what no other channel caught — see
+            // TransactionCapturePipeline.process's useCoarseDedup and DuplicateChecker.
+            entryPoint.transactionCapturePipeline().process(
+                raw,
+                useCoarseDedup = true,
+                merchantOverride = merchant,
+                coarseBudget = budget,
+            )
+        })
+    }
 
     override fun onInterrupt() = Unit
 
