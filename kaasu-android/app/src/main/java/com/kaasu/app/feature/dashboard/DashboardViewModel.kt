@@ -5,13 +5,19 @@ import androidx.lifecycle.viewModelScope
 import com.kaasu.app.core.datastore.SettingsDataStore
 import com.kaasu.app.core.util.BudgetCycle
 import com.kaasu.app.domain.model.Account
+import com.kaasu.app.domain.model.AccountBalance
+import com.kaasu.app.domain.model.Due
 import com.kaasu.app.domain.model.Category
 import com.kaasu.app.domain.money.SpendRules
 import com.kaasu.app.domain.model.Transaction
 import com.kaasu.app.domain.repository.AccountRepository
 import com.kaasu.app.domain.repository.CategoryRepository
 import com.kaasu.app.domain.repository.TransactionRepository
+import com.kaasu.app.domain.usecase.account.GetAccountBalancesUseCase
+import com.kaasu.app.domain.usecase.dues.GetDuesUseCase
+import com.kaasu.app.domain.usecase.subscription.DetectSubscriptionsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
@@ -43,9 +49,22 @@ data class DashboardUiState(
     val categoryMap: Map<Long, Category> = emptyMap(),
     // Needed to name both ends of a transfer — "Union Bank → SBI Card" is derived, not stored.
     val accountMap: Map<Long, Account> = emptyMap(),
+    val accounts: List<Account> = emptyList(),
+    val balances: List<AccountBalance> = emptyList(),
+    val dues: List<Due> = emptyList(),
+    // Null means every account. The chevron beside "ALL ACCOUNTS" promised this filter and had no
+    // callback behind it, so the affordance was decoration.
+    val selectedAccountId: Long? = null,
     val displayName: String = "",
     val isLoading: Boolean = true
-)
+) {
+    val selectedAccount: Account? get() = accounts.firstOrNull { it.id == selectedAccountId }
+
+    val bankBalances: List<AccountBalance> get() = balances.filterNot { it.isCreditCard || it.isUnassigned }
+    val creditCards: List<AccountBalance> get() = balances.filter { it.isCreditCard }
+
+    val accountFilterLabel: String get() = selectedAccount?.displayName?.uppercase() ?: "ALL ACCOUNTS"
+}
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
@@ -53,6 +72,9 @@ class DashboardViewModel @Inject constructor(
     categoryRepository: CategoryRepository,
     accountRepository: AccountRepository,
     settingsDataStore: SettingsDataStore,
+    getAccountBalances: GetAccountBalancesUseCase,
+    private val detectSubscriptions: DetectSubscriptionsUseCase,
+    private val getDues: GetDuesUseCase,
 ) : ViewModel() {
 
     private val zone = ZoneId.systemDefault()
@@ -68,6 +90,16 @@ class DashboardViewModel @Inject constructor(
      * a start day other than the 1st the two screens previously disagreed about what "this month"
      * meant while comparing against the same budget figure.
      */
+    /**
+     * Which account the figures are scoped to. Null is every account.
+     *
+     * Held here rather than in the composable so the filter survives scrolling, rotation and
+     * navigating away and back — a filter that silently resets is worse than none.
+     */
+    private val selectedAccountId = MutableStateFlow<Long?>(null)
+
+    fun onAccountFilterChange(accountId: Long?) { selectedAccountId.value = accountId }
+
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val uiState = settingsDataStore.monthStartDay.flatMapLatest { startDay ->
         val today = LocalDate.now()
@@ -85,13 +117,20 @@ class DashboardViewModel @Inject constructor(
         ) { transactions, prevMonthTx, categories, budget, name ->
             Inputs(transactions, prevMonthTx, categories, budget, name)
         }.combine(accountRepository.getAll()) { inputs, accounts ->
-            buildState(inputs, accounts, today, cycle, previousCycleStart)
+            inputs to accounts
+        }.combine(getAccountBalances()) { (inputs, accounts), balances ->
+            Triple(inputs, accounts, balances)
+        }.combine(selectedAccountId) { (inputs, accounts, balances), filterId ->
+            buildState(inputs, accounts, balances, filterId, today, cycle, previousCycleStart)
         }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = DashboardUiState()
     )
+
+    private fun List<Transaction>.filterByAccount(accountId: Long?): List<Transaction> =
+        if (accountId == null) this else filter { it.accountId == accountId }
 
     /** The five flows combine() can take in one go, so the accounts can be joined on after. */
     private data class Inputs(
@@ -105,11 +144,19 @@ class DashboardViewModel @Inject constructor(
     private fun buildState(
         inputs: Inputs,
         accounts: List<Account>,
+        balances: List<AccountBalance>,
+        filterAccountId: Long?,
         today: LocalDate,
         cycle: BudgetCycle,
         previousCycle: BudgetCycle,
     ): DashboardUiState {
-        val (transactions, prevMonthTx, categories, budget, displayName) = inputs
+        val (allTransactions, allPrevMonthTx, categories, budget, displayName) = inputs
+
+        // Filtered once, here, so every figure below is scoped consistently. Filtering at each
+        // call site is how a screen ends up with a total that disagrees with its own breakdown.
+        // An account that no longer exists selects nothing rather than silently showing everything.
+        val transactions = allTransactions.filterByAccount(filterAccountId)
+        val prevMonthTx = allPrevMonthTx.filterByAccount(filterAccountId)
         val todayStart = today.atStartOfDay(zone).toInstant().toEpochMilli()
         val todayEnd = today.atTime(23, 59, 59).atZone(zone).toInstant().toEpochMilli()
         val categoryMap = categories.associateBy { it.id }
@@ -184,6 +231,17 @@ class DashboardViewModel @Inject constructor(
             recentTransactions = recentTransactions,
             categoryMap = categoryMap,
             accountMap = accounts.associateBy { it.id },
+            accounts = accounts,
+            // Balances are never filtered: "what's in my accounts" is not a question the spend
+            // filter is asking, and hiding the other accounts would make the figures look wrong.
+            balances = balances,
+            dues = getDues(
+                balances = balances,
+                // Subscriptions come from unfiltered history — a renewal is coming whichever
+                // account the owner happens to be looking at.
+                subscriptions = detectSubscriptions(allTransactions + allPrevMonthTx),
+            ),
+            selectedAccountId = filterAccountId,
             displayName = displayName,
             isLoading = false
         )

@@ -3,7 +3,12 @@ package com.kaasu.app.feature.transactions
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kaasu.app.core.datastore.SettingsDataStore
+import com.kaasu.app.core.util.BudgetCycle
 import com.kaasu.app.domain.model.Account
+import com.kaasu.app.domain.model.MerchantVisits
+import com.kaasu.app.domain.money.SpendRules
+import com.kaasu.app.domain.usecase.merchant.GetMerchantVisitsUseCase
 import com.kaasu.app.domain.model.Category
 import com.kaasu.app.domain.model.Transaction
 import com.kaasu.app.domain.repository.AccountRepository
@@ -29,6 +34,8 @@ data class DetailUiState(
     // Every account, for reclassifying this payment as a move between two of them.
     val accounts: List<Account> = emptyList(),
     val counterpartAccount: Account? = null,
+    // "8 visits · ₹3,240 this month" — whether this is a habit or a one-off.
+    val merchantVisits: MerchantVisits? = null,
     val capturedText: String? = null,
     val categories: List<Category> = emptyList(),
     val isLoading: Boolean = true,
@@ -46,6 +53,8 @@ class TransactionDetailViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val transactionRepository: TransactionRepository,
     private val markAsTransfer: MarkAsTransferUseCase,
+    private val getMerchantVisits: GetMerchantVisitsUseCase,
+    private val settingsDataStore: SettingsDataStore,
 ) : ViewModel() {
 
     private val transactionId: Long = checkNotNull(savedStateHandle["transactionId"])
@@ -70,12 +79,19 @@ class TransactionDetailViewModel @Inject constructor(
         val counterpart = tx?.counterpartAccountId?.let { accountRepository.getById(it) }
         val allAccounts = accountRepository.getAll().first()
         val rawText = getRawText(transactionId)
+        // Scoped to the owner's own budget cycle, so "this month" means the same thing here as it
+        // does on the dashboard and in budgets.
+        val cycle = BudgetCycle.current(settingsDataStore.monthStartDay.first())
+        val visits = tx?.takeIf { SpendRules.isSpend(it) }?.let {
+            getMerchantVisits(it.merchantName, cycle.startMillis, cycle.endMillis)
+        }
         DetailUiState(
             transaction = tx,
             category = category,
             account = account,
             accounts = allAccounts,
             counterpartAccount = counterpart,
+            merchantVisits = visits,
             capturedText = rawText,
             categories = categories,
             isLoading = false,
