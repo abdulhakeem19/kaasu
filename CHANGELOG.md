@@ -15,6 +15,68 @@ Updated with each push-worthy commit. The goal is to always know the path we cam
 
 ---
 
+## [1.1.0 — Money correctness: transfers, balances, and a home screen that works] — 2026-09-15
+### Fixed
+- **A transfer was being counted as spending.** A ₹2,399 subscription auto-debited on the SBI card,
+  then ₹2,399 moved from savings to clear that card, was reported as ₹4,798. The money left once.
+  Five separate copies of `type == EXPENSE || type == TRANSFER` — dashboard, budgets, reports
+  (twice), needs-a-tag — plus a day-group total, all agreed that moving your own money is spending.
+  They are now one `SpendRules` object, and two unused DAO aggregates carrying a sixth, different
+  definition are deleted.
+- **A credit-card bill counted the same rupees twice.** A bill payment is simply a transfer whose
+  other end is a `CREDIT_CARD` account; the purchase stays the real expense. The seeded
+  `credit card` / `card bill` rules had been filing bill payments under **Bills**, which made them
+  spend by definition — the double-count encoded as data. Existing installs are corrected by
+  migration. The Bills budget will shrink, correctly.
+- **An account number masked as `A/C XXXXX103956` read as `1039`, then as nothing at all.** The
+  last-four pattern took the first four digits after the mask and fell through to null, so a credit
+  had no account, could not be paired with its debit, and an ordinary bank-to-bank transfer was
+  stored as unexplained income. Now reads `3956`, as the bank's own app does.
+- **The dashboard showed yesterday as "Today" forever.** It cached `LocalDate.now()` and all six
+  window bounds in constructor fields, so a view model outliving midnight never caught up.
+- **Dashboard and Budgets disagreed about "this month"** whenever the month-start day was not the
+  1st — only Budgets honoured the setting, while both compared against the same budget figure.
+- **Deleting an account made its money vanish.** It hard-deleted while transactions still pointed at
+  the dead id, so those rows dropped out of every per-account figure with no error. Now a soft
+  delete.
+- **Statement imports moved no balances** — `accountId` was set on nothing, so imported rows counted
+  toward spending while leaving balances untouched.
+- **Restoring a backup silently reset** the month-start day, display name and currency symbol.
+
+### Added
+- **Transfer groups** (migration 8→9). Both legs of a movement share a group id and a role, each
+  moving only its own account, so a group nets to zero. One-legged groups are expected — a card
+  rarely announces that its bill was paid.
+- **Account balances** (migration 9→10), derived on read rather than stored: `opening + Σ signed
+  deltas`. A stored running total must be corrected by every path that touches a transaction, and
+  the first one that forgets corrupts it permanently. An account with no opening balance reports
+  *unknown*, never a confident ₹0.
+- **Reconciliation against your bank's own figure.** Banks state "Avl Bal" in their messages;
+  `BalanceParser` reads it and shows it beside the derived balance, with one tap to re-anchor. Never
+  adopted silently — that would hide every message Kaasu missed. Balance-only messages, previously
+  discarded, now feed this.
+- **From/To on the transfer tab**, writing both legs, and **"Move between my accounts"** on any
+  transaction as the manual fallback — optionally remembering the merchant.
+- **A working account filter** on the home screen. "ALL ACCOUNTS ˅" was a chevron with no callback,
+  advertising a filter that existed nowhere in the app.
+- **Visit counts** — "8 visits · ₹3,240 this month" — grouped on read, not a stale counter column.
+- **Dues & reminders**, derived from a card's due day against what is outstanding plus a
+  subscription's next estimated charge. No reminders table to drift out of sync.
+- **Categories, Accounts and Credit cards** sections. `categoryBreakdown` was already being computed
+  and never rendered.
+- Room migration tests over the exported schemas, and shared UI components (`KaasuCard`,
+  `SectionHeader`, `SpendRing`, `AccountCard`).
+
+### Removed
+- Three onboarding routes — `privacy_promise`, `notification_permission`, `budget_setup` — declared
+  in `Screen.kt` with no `composable()` registered. Navigating to one would have thrown.
+
+### Notes
+- Backup format is now VERSION 3. Older backups still restore; every added key reads as absent.
+- Migrations are one-way: once a database reaches schema 10, version 1.0.3 can no longer open it.
+
+---
+
 ## [Phase 12: Capture correctness — duplicates, transfers, notes, failed payments] — 2026-09-14
 ### Fixed
 - **Every bank SMS was being captured twice.** `SmsReceiver` reads the message directly, and the
