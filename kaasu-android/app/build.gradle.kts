@@ -101,6 +101,22 @@ ksp {
 }
 
 dependencies {
+    // Room's migration-test helpers read the exported schema JSON through kotlinx.serialization.
+    // room-testing brings serialization-json 1.8.1, while serialization-core arrives transitively
+    // at 1.7.3 via androidx.lifecycle and is then pinned onto the androidTest classpath by AGP's
+    // consistent resolution with the app's runtime. json 1.8.1 calling into core 1.7.3 throws
+    // AbstractMethodError before a single line of migration SQL runs, so every migration test
+    // failed for a reason that had nothing to do with migrations.
+    //
+    // A constraint rather than a dependency: it raises the version already on the classpath
+    // without adding an edge, and raising core (rather than lowering json) keeps the app and its
+    // instrumented tests on one version, which is the point of consistent resolution.
+    constraints {
+        implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.8.1") {
+            because("room-testing's serialization-json 1.8.1 requires core 1.8.x")
+        }
+    }
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
