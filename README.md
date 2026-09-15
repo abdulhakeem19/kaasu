@@ -61,14 +61,55 @@ Nothing leaves your phone — there is no server for it to leave to.
 
 <br>
 
-Every release ships a `.sha256` file next to the APK. Check the download matches:
+Kaasu is not on the Play Store, so no store listing vouches for a download. Two things do.
 
-```bash
-sha256sum kaasu-1.0.0.apk        # compare with the value in the release notes
+**1. The signing certificate — the durable identity.**
+
+Every official release is signed by the same key. Android enforces this: an APK signed by any other
+key *cannot* install as an update over a genuine Kaasu, it is refused outright. Anyone can rebuild
+this source, but nobody else can produce this signature.
+
+```
+SHA-256  A2:86:82:47:92:E6:66:16:ED:51:EA:AD:4A:6B:BA:90:
+         B6:19:BA:E7:70:C5:1B:32:3F:7C:51:B3:6E:51:41:C9
 ```
 
-The APK is built by GitHub Actions from the tagged commit, so the run log shows exactly which
-source produced it. Nothing is uploaded from anyone's laptop.
+Check any APK against it before installing:
+
+```bash
+apksigner verify --print-certs kaasu-1.1.0.apk
+# Signer #1 certificate SHA-256 digest: a286824792e66616ed51eaad4a6bba90b619bae770c51b323f7c51b36e5141c9
+```
+
+`apksigner` ships with the Android SDK build-tools. Without the SDK, `keytool -printcert -jarfile
+kaasu-1.1.0.apk` prints the same fingerprint.
+
+**2. The checksum — this exact file.**
+
+Every release ships a `.sha256` next to the APK:
+
+```bash
+shasum -a 256 kaasu-1.1.0.apk    # compare with kaasu-1.1.0.apk.sha256
+```
+
+The APK is built by GitHub Actions from the tagged commit, so the run log shows exactly which source
+produced it. Nothing is uploaded from anyone's laptop.
+
+**3. Build provenance — where it was built.**
+
+GitHub signs a statement that the APK came from this repository, this workflow and this commit,
+which neither a checksum nor a signature can tell you:
+
+```bash
+gh attestation verify kaasu-1.1.0.apk --repo abdulhakeem19/kaasu
+```
+
+**Already installed?** Settings → About shows the signing key of the running build and whether it
+matches. Read it against the fingerprint above.
+
+One caveat, stated plainly: that in-app check is a convenience, not a guarantee. This source is
+public, so a repackaged app could be altered to claim anything. The check that cannot be tampered
+with is `apksigner`, run on the file **before** you install it.
 
 </details>
 

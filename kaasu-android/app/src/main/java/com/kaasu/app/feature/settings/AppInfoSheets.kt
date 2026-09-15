@@ -1,6 +1,12 @@
 package com.kaasu.app.feature.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
+import com.kaasu.app.core.security.BuildAuthenticity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +33,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -92,10 +99,72 @@ fun AboutDialog(onWhatsNew: () -> Unit, onClose: () -> Unit) {
                     fontSize = 13.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(10.dp))
+                BuildAuthenticityRow()
+                Spacer(Modifier.height(10.dp))
                 Text("Made in Chennai", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = KaasuColors.forest)
             }
         }
     )
+}
+
+/**
+ * Says which build this is, and shows the fingerprint that proves it.
+ *
+ * Kaasu is not on the Play Store, so nothing vouches for a download except the signing certificate:
+ * only the release keystore can produce it, and Android will refuse an update signed by any other.
+ *
+ * The fingerprint is shown rather than only a verdict, because a verdict from an app that could
+ * itself have been repackaged is worth very little on its own — the value is in comparing what the
+ * phone reports against what the README publishes.
+ */
+@Composable
+private fun BuildAuthenticityRow() {
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    val status = remember { BuildAuthenticity.status(context) }
+    val fingerprint = remember { BuildAuthenticity.signingFingerprint(context) }
+
+    val (label, tint) = when (status) {
+        BuildAuthenticity.Status.Official -> "✓ Official build" to KaasuColors.forest
+        BuildAuthenticity.Status.DebugBuild -> "Developer build" to KaasuColors.muted
+        is BuildAuthenticity.Status.Unrecognised -> "⚠ Not an official build" to KaasuColors.expense
+        BuildAuthenticity.Status.Unknown -> "Signature unavailable" to KaasuColors.expense
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(tint.copy(alpha = 0.08f))
+            .clickable {
+                fingerprint?.let { clipboard.setText(AnnotatedString(BuildAuthenticity.formatForDisplay(it))) }
+            }
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Text(label, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = tint)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = "Signing key · tap to copy",
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = BuildAuthenticity.formatForDisplay(fingerprint),
+            fontSize = 10.sp,
+            lineHeight = 14.sp,
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = "Compare this with the fingerprint published in the README. " +
+                "Before installing, verify the APK itself with apksigner — a repackaged app " +
+                "could be changed to show anything here.",
+            fontSize = 11.sp,
+            lineHeight = 15.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
