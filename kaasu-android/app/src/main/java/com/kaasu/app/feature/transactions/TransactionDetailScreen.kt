@@ -62,6 +62,7 @@ import com.kaasu.app.core.util.formatRupees
 import com.kaasu.app.core.util.toComposeColor
 import com.kaasu.app.domain.model.Category
 import com.kaasu.app.domain.model.Transaction
+import com.kaasu.app.core.util.toAmountDisplay
 import com.kaasu.app.domain.model.Account
 import com.kaasu.app.domain.model.TransactionType
 import com.kaasu.app.domain.repository.SplitSlice
@@ -150,6 +151,41 @@ fun TransactionDetailScreen(
                     val rawText = state.capturedText
                     if (!rawText.isNullOrBlank()) {
                         NotificationTextCard(rawText = rawText)
+                    }
+
+                    // ── HOW OFTEN ────────────────────────────────────────────
+                    // Whether this is a habit or a one-off, which a single row cannot say. The
+                    // difference between a ₹300 coffee and ₹2,400 of coffee.
+                    state.merchantVisits?.takeIf { it.isRepeat }?.let { visits ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(KaasuColors.forest.copy(alpha = 0.08f))
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "${visits.totalVisits} visits",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = KaasuColors.ink
+                                )
+                                Text(
+                                    text = if (visits.visitsInWindow > 0) {
+                                        "${visits.spentInWindowInPaise.toAmountDisplay()} this month · " +
+                                            "${visits.averageSpendInPaise.toAmountDisplay()} avg"
+                                    } else {
+                                        "${visits.totalSpentInPaise.toAmountDisplay()} all time · " +
+                                            "${visits.averageSpendInPaise.toAmountDisplay()} avg"
+                                    },
+                                    fontSize = 12.sp,
+                                    color = KaasuColors.muted
+                                )
+                            }
+                        }
                     }
 
                     // ── ACTION BUTTONS ───────────────────────────────────────

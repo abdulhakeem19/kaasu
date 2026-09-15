@@ -143,6 +143,28 @@ class SpendRulesTest {
         assertEquals(10_000L, SpendRules.totalIncomeInPaise(listOf(tx(TransactionType.INCOME))))
     }
 
+    // ── The account filter must not lose money ────────────────────────────────
+
+    @Test
+    fun `per-account totals add back up to the unfiltered total`() {
+        // The dashboard's account filter partitions by accountId. Rows with no account are the easy
+        // ones to forget, and forgetting them makes the parts quietly add up to less than the whole.
+        val rows = listOf(
+            tx(TransactionType.EXPENSE, 100_000L).copy(accountId = 1L),
+            tx(TransactionType.EXPENSE, 250_000L).copy(accountId = 2L),
+            tx(TransactionType.REFUND, 40_000L).copy(accountId = 1L),
+            tx(TransactionType.TRANSFER, 500_000L).copy(accountId = 1L),
+            tx(TransactionType.EXPENSE, 30_000L).copy(accountId = null),
+        )
+
+        val whole = SpendRules.netSpendInPaise(rows)
+        val parts = rows.map { it.accountId }.distinct()
+            .sumOf { id -> SpendRules.netSpendInPaise(rows.filter { it.accountId == id }) }
+
+        assertEquals(whole, parts)
+        assertEquals(340_000L, whole)
+    }
+
     @Test
     fun `an empty month totals zero both ways`() {
         assertEquals(0L, SpendRules.netSpendInPaise(emptyList()))

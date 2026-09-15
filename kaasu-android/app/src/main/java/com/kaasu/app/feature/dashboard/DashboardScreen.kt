@@ -5,6 +5,9 @@ import android.provider.Settings
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,6 +58,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kaasu.app.ui.theme.KaasuColors
 import com.kaasu.app.core.util.formatRupees
 import com.kaasu.app.core.util.toComposeColor
+import com.kaasu.app.core.util.toAmountDisplay
+import com.kaasu.app.domain.model.Account
+import com.kaasu.app.domain.model.Due
+import com.kaasu.app.ui.components.AccountCard
+import com.kaasu.app.ui.components.KaasuCard
+import com.kaasu.app.ui.components.SectionHeader
 import com.kaasu.app.ui.components.TransactionCard
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -72,6 +81,7 @@ fun DashboardScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var isNotificationGranted by remember { mutableStateOf(true) }
+    var showAccountFilter by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -114,7 +124,9 @@ fun DashboardScreen(
                 totalSpentInPaise = state.totalSpentInPaise,
                 monthlyBudgetInPaise = state.monthlyBudgetInPaise,
                 monthLabel = state.monthLabel,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                accountFilterLabel = state.accountFilterLabel,
+                onAccountFilterClick = { showAccountFilter = true }
             )
         }
 
@@ -175,6 +187,239 @@ fun DashboardScreen(
                 )
             }
         }
+
+        // ── Dues & reminders ──────────────────────────────────────────────────
+        // Derived from a card's due day against what is outstanding, plus a subscription's next
+        // estimated charge. No reminders table, so nothing can drift out of sync with the rows.
+        if (state.dues.isNotEmpty()) {
+            item {
+                SectionHeader(
+                    title = "Dues & reminders",
+                    modifier = Modifier.padding(horizontal = 24.dp).padding(top = 20.dp, bottom = 8.dp)
+                )
+            }
+            item {
+                KaasuCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    state.dues.take(4).forEach { due -> DueRow(due) }
+                }
+            }
+        }
+
+        // ── Where it went ─────────────────────────────────────────────────────
+        // categoryBreakdown was already being computed into state and never rendered.
+        if (state.categoryBreakdown.isNotEmpty()) {
+            item {
+                SectionHeader(
+                    title = "Categories",
+                    actionLabel = "Budgets",
+                    onActionClick = onSeeAllClick,
+                    modifier = Modifier.padding(horizontal = 24.dp).padding(top = 20.dp, bottom = 8.dp)
+                )
+            }
+            item {
+                KaasuCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    state.categoryBreakdown.take(5).forEach { row ->
+                        CategoryBreakdownRow(row, state.totalSpentInPaise)
+                    }
+                }
+            }
+        }
+
+        // ── Accounts ──────────────────────────────────────────────────────────
+        if (state.bankBalances.isNotEmpty()) {
+            item {
+                SectionHeader(
+                    title = "Accounts",
+                    modifier = Modifier.padding(horizontal = 24.dp).padding(top = 20.dp, bottom = 8.dp)
+                )
+            }
+            item {
+                KaasuCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    state.bankBalances.forEach { balance ->
+                        AccountCard(
+                            balance = balance,
+                            // Tapping an account scopes the figures above to it.
+                            onClick = { viewModel.onAccountFilterChange(balance.account?.id) }
+                        )
+                    }
+                }
+            }
+        }
+
+        // ── Credit cards ──────────────────────────────────────────────────────
+        // Separate because an outstanding amount is a debt, not money you hold, and mixing the two
+        // into one list is how a total starts meaning nothing.
+        if (state.creditCards.isNotEmpty()) {
+            item {
+                SectionHeader(
+                    title = "Credit cards",
+                    modifier = Modifier.padding(horizontal = 24.dp).padding(top = 20.dp, bottom = 8.dp)
+                )
+            }
+            item {
+                KaasuCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    state.creditCards.forEach { balance ->
+                        AccountCard(
+                            balance = balance,
+                            onClick = { viewModel.onAccountFilterChange(balance.account?.id) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    if (showAccountFilter) {
+        AccountFilterSheet(
+            accounts = state.accounts,
+            selectedId = state.selectedAccountId,
+            onSelect = {
+                viewModel.onAccountFilterChange(it)
+                showAccountFilter = false
+            },
+            onDismiss = { showAccountFilter = false }
+        )
+    }
+}
+
+/** One upcoming payment. */
+@Composable
+private fun DueRow(due: Due) {
+    val isUrgent = due.isOverdue() || due.daysUntil() <= 3
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = due.title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = KaasuColors.ink,
+                maxLines = 1
+            )
+            Text(
+                text = when (due.kind) {
+                    Due.Kind.CARD_BILL -> "Card bill · ${due.whenLabel()}"
+                    Due.Kind.SUBSCRIPTION -> "Renews · ${due.whenLabel()}"
+                },
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 12.sp,
+                color = if (isUrgent) KaasuColors.expense else KaasuColors.muted
+            )
+        }
+        Text(
+            text = due.amountInPaise.toAmountDisplay(),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.ExtraBold,
+            color = KaasuColors.ink
+        )
+    }
+}
+
+/** A category and its share of the month. */
+@Composable
+private fun CategoryBreakdownRow(row: CategorySpend, totalSpentInPaise: Long) {
+    // Guarded against a zero or negative month: refunds can outrun purchases, and a share of a
+    // non-positive total is meaningless rather than merely large.
+    val share = if (totalSpentInPaise > 0) {
+        (row.amountInPaise.toFloat() / totalSpentInPaise).coerceIn(0f, 1f)
+    } else 0f
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = row.category?.name ?: "Uncategorised",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                color = KaasuColors.ink
+            )
+            Text(
+                text = row.amountInPaise.toAmountDisplay(),
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Bold,
+                color = KaasuColors.ink
+            )
+        }
+        LinearProgressIndicator(
+            progress = { share },
+            modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)),
+            color = KaasuColors.forest,
+            trackColor = KaasuColors.border,
+            gapSize = 0.dp,
+            drawStopIndicator = {}
+        )
+    }
+}
+
+/** Scopes every figure above to one account, or to all of them. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AccountFilterSheet(
+    accounts: List<Account>,
+    selectedId: Long?,
+    onSelect: (Long?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Show spending from",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = KaasuColors.ink
+            )
+
+            FilterOptionRow("All accounts", selectedId == null) { onSelect(null) }
+            accounts.forEach { account ->
+                FilterOptionRow(
+                    label = account.lastFourDigits
+                        ?.let { "${account.displayName} ·· $it" }
+                        ?: account.displayName,
+                    isSelected = selectedId == account.id
+                ) { onSelect(account.id) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FilterOptionRow(label: String, isSelected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (isSelected) KaasuColors.forest.copy(alpha = 0.12f)
+                else MaterialTheme.colorScheme.surface
+            )
+            .border(
+                1.dp,
+                if (isSelected) KaasuColors.forest else KaasuColors.border,
+                RoundedCornerShape(12.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            color = KaasuColors.ink,
+            modifier = Modifier.weight(1f)
+        )
+        if (isSelected) Text("✓", color = KaasuColors.forest)
     }
 }
 
@@ -248,7 +493,9 @@ private fun SpendCard(
     totalSpentInPaise: Long,
     monthlyBudgetInPaise: Long,
     monthLabel: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    accountFilterLabel: String = "ALL ACCOUNTS",
+    onAccountFilterClick: () -> Unit = {},
 ) {
     val progress = if (monthlyBudgetInPaise > 0)
         (totalSpentInPaise.toFloat() / monthlyBudgetInPaise).coerceIn(0f, 1f)
@@ -274,16 +521,24 @@ private fun SpendCard(
                     letterSpacing = 1.sp,
                     color = KaasuColors.onForest.copy(alpha = 0.75f)
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // This was a chevron with no callback behind it — an affordance promising a filter
+                // that did not exist anywhere in the app.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable(onClick = onAccountFilterClick)
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                ) {
                     Text(
-                        text = "ALL ACCOUNTS",
+                        text = accountFilterLabel,
                         style = MaterialTheme.typography.labelSmall,
                         letterSpacing = 1.sp,
                         color = KaasuColors.onForest.copy(alpha = 0.75f)
                     )
                     Icon(
                         Icons.Default.KeyboardArrowDown,
-                        contentDescription = null,
+                        contentDescription = "Filter by account",
                         modifier = Modifier.size(14.dp),
                         tint = KaasuColors.onForest.copy(alpha = 0.75f)
                     )
