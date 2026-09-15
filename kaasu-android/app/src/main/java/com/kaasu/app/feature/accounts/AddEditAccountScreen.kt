@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
@@ -108,6 +109,23 @@ fun AddEditAccountScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            OutlinedTextField(
+                value = state.openingBalanceText,
+                onValueChange = viewModel::onOpeningBalanceChange,
+                label = { Text("Balance right now (optional)") },
+                placeholder = { Text("e.g. 12430") },
+                isError = state.openingBalanceError != null,
+                supportingText = {
+                    Text(
+                        state.openingBalanceError
+                            ?: "Kaasu counts forward from this. Leave it blank and it won't guess."
+                    )
+                },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth()
+            )
+
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Account type", style = MaterialTheme.typography.labelMedium)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -118,6 +136,44 @@ fun AddEditAccountScreen(
                             label = { Text(type.chipLabel()) }
                         )
                     }
+                }
+            }
+
+            // Asked once, because a card's statement and due dates never change. Parsing them out
+            // of SMS every month would be far more work for a worse answer.
+            if (state.accountType == AccountType.CREDIT_CARD) {
+                OutlinedTextField(
+                    value = state.creditLimitText,
+                    onValueChange = viewModel::onCreditLimitChange,
+                    label = { Text("Credit limit (optional)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = state.statementDayText,
+                        onValueChange = viewModel::onStatementDayChange,
+                        label = { Text("Statement day") },
+                        placeholder = { Text("e.g. 18") },
+                        isError = state.dayError != null,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = state.dueDayText,
+                        onValueChange = viewModel::onDueDayChange,
+                        label = { Text("Due day") },
+                        placeholder = { Text("e.g. 5") },
+                        isError = state.dayError != null,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                state.dayError?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
             }
 

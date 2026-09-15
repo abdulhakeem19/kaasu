@@ -300,7 +300,21 @@ class CardBillDoubleCountTest {
             accounts += account.copy(id = id)
             return id
         }
-        override suspend fun update(account: Account) {}
+        override suspend fun update(account: Account) {
+            val i = accounts.indexOfFirst { it.id == account.id }
+            if (i >= 0) accounts[i] = account
+        }
+
+        override suspend fun setLastStatedBalance(id: Long, balanceInPaise: Long, at: Long) {
+            val i = accounts.indexOfFirst { it.id == id }
+            if (i >= 0) accounts[i] = accounts[i].copy(
+                lastStatedBalanceInPaise = balanceInPaise,
+                lastStatedBalanceAt = at,
+            )
+        }
+
+        fun statedBalanceOf(id: Long): Long? =
+            accounts.firstOrNull { it.id == id }?.lastStatedBalanceInPaise
         override suspend fun delete(id: Long) { accounts.removeAll { it.id == id } }
     }
 

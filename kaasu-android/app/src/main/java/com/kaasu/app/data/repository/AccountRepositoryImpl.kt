@@ -28,6 +28,13 @@ class AccountRepositoryImpl @Inject constructor(
     override suspend fun update(account: Account) =
         dao.update(account.toEntity())
 
+    /**
+     * Soft delete. Transactions keep pointing at this account, so their money stays visible and
+     * countable — a hard delete would strand them against a missing id and make the money vanish.
+     */
     override suspend fun delete(id: Long) =
-        dao.deleteById(id)
+        dao.deactivate(id)
+
+    override suspend fun setLastStatedBalance(id: Long, balanceInPaise: Long, at: Long) =
+        dao.setLastStatedBalance(id, balanceInPaise, at)
 }

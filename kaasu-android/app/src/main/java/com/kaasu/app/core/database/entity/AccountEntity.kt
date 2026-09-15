@@ -15,5 +15,17 @@ data class AccountEntity(
     val accountType: String,
     val colorArgb: Int?,
     val isActive: Boolean = true,
-    val createdAt: Long
+    val createdAt: Long,
+    // The anchor the balance counts forward from. Null means unset — deliberately distinct from
+    // zero, which would be a balance the app is claiming to know and does not.
+    val openingBalanceInPaise: Long? = null,
+    val openingBalanceAt: Long? = null,
+    // What the bank itself last stated ("Avl Bal: Rs.11,980"). Advisory: shown beside the derived
+    // figure so a disagreement is visible, never silently used as the balance.
+    val lastStatedBalanceInPaise: Long? = null,
+    val lastStatedBalanceAt: Long? = null,
+    // Credit cards only.
+    val creditLimitInPaise: Long? = null,
+    val statementDay: Int? = null,
+    val dueDay: Int? = null
 )

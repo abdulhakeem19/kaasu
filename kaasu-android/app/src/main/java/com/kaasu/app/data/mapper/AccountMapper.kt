@@ -11,7 +11,14 @@ fun AccountEntity.toDomain(): Account = Account(
     accountType = runCatching { AccountType.valueOf(accountType) }.getOrDefault(AccountType.SAVINGS),
     colorArgb = colorArgb,
     isActive = isActive,
-    createdAt = createdAt
+    createdAt = createdAt,
+    openingBalanceInPaise = openingBalanceInPaise,
+    openingBalanceAt = openingBalanceAt,
+    lastStatedBalanceInPaise = lastStatedBalanceInPaise,
+    lastStatedBalanceAt = lastStatedBalanceAt,
+    creditLimitInPaise = creditLimitInPaise,
+    statementDay = statementDay,
+    dueDay = dueDay,
 )
 
 fun Account.toEntity(): AccountEntity = AccountEntity(
@@ -21,5 +28,12 @@ fun Account.toEntity(): AccountEntity = AccountEntity(
     accountType = accountType.name,
     colorArgb = colorArgb,
     isActive = isActive,
-    createdAt = createdAt
+    createdAt = createdAt,
+    openingBalanceInPaise = openingBalanceInPaise,
+    openingBalanceAt = openingBalanceAt,
+    lastStatedBalanceInPaise = lastStatedBalanceInPaise,
+    lastStatedBalanceAt = lastStatedBalanceAt,
+    creditLimitInPaise = creditLimitInPaise,
+    statementDay = statementDay,
+    dueDay = dueDay,
 )
