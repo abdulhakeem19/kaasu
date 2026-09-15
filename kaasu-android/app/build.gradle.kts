@@ -20,6 +20,16 @@ android {
         versionName = "1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+
+        // SHA-256 of the release signing certificate. Public by nature: `apksigner verify
+        // --print-certs` prints it from any copy of the APK, so it is a fingerprint to compare
+        // against, never a secret. The app shows it so the value on a phone can be read against
+        // the one published in the README.
+        buildConfigField(
+            "String",
+            "EXPECTED_SIGNING_SHA256",
+            "\"a286824792e66616ed51eaad4a6bba90b619bae770c51b323f7c51b36e5141c9\""
+        )
     }
 
     signingConfigs {

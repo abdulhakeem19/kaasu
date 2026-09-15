@@ -11,6 +11,11 @@ on:
 
 permissions:
   contents: write
+  # Build provenance: GitHub signs a statement that this exact APK came from this repository,
+  # this workflow and this commit. Neither the checksum nor the APK signature can say that --
+  # they prove the file is intact and signed by the release key, not where it was built.
+  id-token: write
+  attestations: write
 
 jobs:
   release:
@@ -82,6 +87,13 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "sha=$(cut -d' ' -f1 "kaasu-${VERSION}.apk.sha256")" >> "$GITHUB_OUTPUT"
+
+      # Verified afterwards with:
+      #   gh attestation verify kaasu-<version>.apk --repo abdulhakeem19/kaasu
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/kaasu-${{ steps.stage.outputs.version }}.apk
 
       - name: Publish release
         env:
