@@ -15,7 +15,9 @@ import com.kaasu.app.domain.usecase.transaction.GetTransactionRawTextUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import com.kaasu.app.domain.usecase.transaction.MarkAsTransferUseCase
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -24,6 +26,9 @@ data class DetailUiState(
     val transaction: Transaction? = null,
     val category: Category? = null,
     val account: Account? = null,
+    // Every account, for reclassifying this payment as a move between two of them.
+    val accounts: List<Account> = emptyList(),
+    val counterpartAccount: Account? = null,
     val capturedText: String? = null,
     val categories: List<Category> = emptyList(),
     val isLoading: Boolean = true,
@@ -40,6 +45,7 @@ class TransactionDetailViewModel @Inject constructor(
     private val getRawText: GetTransactionRawTextUseCase,
     private val accountRepository: AccountRepository,
     private val transactionRepository: TransactionRepository,
+    private val markAsTransfer: MarkAsTransferUseCase,
 ) : ViewModel() {
 
     private val transactionId: Long = checkNotNull(savedStateHandle["transactionId"])
@@ -61,11 +67,15 @@ class TransactionDetailViewModel @Inject constructor(
     ) { tx, categories, actionState ->
         val category = tx?.categoryId?.let { id -> categories.find { it.id == id } }
         val account = tx?.accountId?.let { accountRepository.getById(it) }
+        val counterpart = tx?.counterpartAccountId?.let { accountRepository.getById(it) }
+        val allAccounts = accountRepository.getAll().first()
         val rawText = getRawText(transactionId)
         DetailUiState(
             transaction = tx,
             category = category,
             account = account,
+            accounts = allAccounts,
+            counterpartAccount = counterpart,
             capturedText = rawText,
             categories = categories,
             isLoading = false,
@@ -100,6 +110,19 @@ class TransactionDetailViewModel @Inject constructor(
         viewModelScope.launch {
             transactionRepository.setDuplicate(current.id, true)
             actions.value = actions.value.copy(isMarkedDuplicate = true)
+        }
+    }
+
+    /**
+     * Reclassifies this payment as money moved between the owner's own accounts.
+     *
+     * The manual counterpart to automatic detection, which is deliberately conservative — it would
+     * rather miss a transfer than erase a real expense. [rememberMerchant] writes a rule so the
+     * same payment is caught by itself next month.
+     */
+    fun markAsTransfer(counterpartAccountId: Long?, rememberMerchant: Boolean) {
+        viewModelScope.launch {
+            markAsTransfer(transactionId, counterpartAccountId, rememberMerchant)
         }
     }
 

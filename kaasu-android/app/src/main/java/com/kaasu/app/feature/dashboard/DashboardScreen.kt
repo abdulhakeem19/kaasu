@@ -163,7 +163,9 @@ fun DashboardScreen(
                     transaction = tx,
                     category = tx.categoryId?.let { state.categoryMap[it] },
                     onClick = { onTransactionClick(tx.id) },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                    accountName = tx.accountId?.let { state.accountMap[it]?.displayName },
+                    counterpartAccountName = tx.counterpartAccountId?.let { state.accountMap[it]?.displayName },
                 )
             }
         } else {

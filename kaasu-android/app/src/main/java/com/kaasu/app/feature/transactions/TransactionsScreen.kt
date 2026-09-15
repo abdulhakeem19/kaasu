@@ -248,7 +248,8 @@ fun TransactionsScreen(
                                 category = tx.categoryId?.let { state.categoryMap[it] },
                                 onClick = { onTransactionClick(tx.id) },
                                 accountName = tx.accountId?.let { state.accountMap[it]?.displayName },
-                                lastFourDigits = tx.accountId?.let { state.accountMap[it]?.lastFourDigits }
+                                lastFourDigits = tx.accountId?.let { state.accountMap[it]?.lastFourDigits },
+                                counterpartAccountName = tx.counterpartAccountId?.let { state.accountMap[it]?.displayName },
                             )
                         }
                     }

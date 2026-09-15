@@ -68,8 +68,21 @@ android {
         buildConfig = true
     }
 
+    // MigrationTest reads the exported schemas as its fixtures, so they have to be packaged
+    // into the test APK's assets.
+    sourceSets["androidTest"].assets.srcDir("$projectDir/schemas")
+
     packaging {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+    }
+
+    testOptions {
+        unitTests {
+            // The capture pipeline logs through android.util.Log, which throws "not mocked" on the
+            // JVM. Returning defaults lets the real pipeline be tested without wrapping every log
+            // call in an interface that exists only for tests.
+            isReturnDefaultValues = true
+        }
     }
 }
 
@@ -135,6 +148,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)

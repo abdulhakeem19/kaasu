@@ -119,5 +119,13 @@ class TransactionRepositoryImpl @Inject constructor(
 
 
 
+    override suspend fun getByTransferGroup(groupId: String): List<Transaction> =
+        dao.getByTransferGroup(groupId).map { it.toDomain() }
+
+    override fun observeHalfLinkedTransfers(): Flow<List<Transaction>> =
+        dao.observeHalfLinkedTransfers().map { list -> list.map { it.toDomain() } }
+
+    override suspend fun deleteByTransferGroup(groupId: String) = dao.deleteByTransferGroup(groupId)
+
     override suspend fun deleteAll() = dao.deleteAll()
 }

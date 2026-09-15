@@ -39,7 +39,9 @@ class BackupManager @Inject constructor(
     private val settings: SettingsDataStore,
 ) {
     companion object {
-        const val VERSION = 1
+        // 2 adds transfer groups to transactions, plus the three settings that were quietly
+        // being lost on restore. Version-1 files still restore: every added key reads as absent.
+        const val VERSION = 2
         const val FILE_NAME = "kaasu_backup.json"
     }
 
@@ -50,6 +52,11 @@ class BackupManager @Inject constructor(
             put("version", VERSION)
             put("exportedAt", System.currentTimeMillis())
             put("monthlyBudgetInPaise", settings.monthlyBudgetInPaise.first())
+            // Restoring a backup used to silently reset these to defaults — the budget cycle in
+            // particular, which decides what "this month" means for every total.
+            put("monthStartDay", settings.monthStartDay.first())
+            put("displayName", settings.displayName.first())
+            put("currencySymbol", settings.currencySymbol.first())
             put("transactions", transactionDao.getAllForBackup().toJsonArray(::txToJson))
             put("categories", categoryDao.getAllForBackup().toJsonArray(::catToJson))
             put("accounts", accountDao.getAllForBackup().toJsonArray(::accToJson))
@@ -91,6 +98,9 @@ class BackupManager @Inject constructor(
         if (root.has("monthlyBudgetInPaise")) {
             settings.setMonthlyBudget(root.getLong("monthlyBudgetInPaise"))
         }
+        if (root.has("monthStartDay")) settings.setMonthStartDay(root.getInt("monthStartDay"))
+        root.strOrNull("displayName")?.let { settings.setDisplayName(it) }
+        root.strOrNull("currencySymbol")?.let { settings.setCurrencySymbol(it) }
         return transactions.size
     }
 
@@ -107,6 +117,8 @@ class BackupManager @Inject constructor(
         put("isIgnored", t.isIgnored); putN("note", t.note); putN("accountId", t.accountId)
         put("isRecurring", t.isRecurring); putN("parentId", t.parentId)
         put("isDuplicate", t.isDuplicate)
+        putN("transferGroupId", t.transferGroupId); putN("transferRole", t.transferRole)
+        putN("counterpartAccountId", t.counterpartAccountId)
     }
 
     private fun jsonToTx(o: JSONObject) = TransactionEntity(
@@ -119,7 +131,11 @@ class BackupManager @Inject constructor(
         isManual = o.optBoolean("isManual"), isTransfer = o.optBoolean("isTransfer"), isRefund = o.optBoolean("isRefund"),
         isIgnored = o.optBoolean("isIgnored"), note = o.strOrNull("note"), accountId = o.longOrNull("accountId"),
         isRecurring = o.optBoolean("isRecurring"), parentId = o.longOrNull("parentId"),
-        isDuplicate = o.optBoolean("isDuplicate")
+        isDuplicate = o.optBoolean("isDuplicate"),
+        // Absent in version-1 files, which is exactly what a pre-transfer-group row should restore
+        // as: ungrouped, and repairable later by TransferBackfillManager.
+        transferGroupId = o.strOrNull("transferGroupId"), transferRole = o.strOrNull("transferRole"),
+        counterpartAccountId = o.longOrNull("counterpartAccountId")
     )
 
     private fun catToJson(c: CategoryEntity) = JSONObject().apply {

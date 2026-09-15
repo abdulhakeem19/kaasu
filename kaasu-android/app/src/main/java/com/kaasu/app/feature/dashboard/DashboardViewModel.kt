@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kaasu.app.core.datastore.SettingsDataStore
 import com.kaasu.app.core.util.BudgetCycle
+import com.kaasu.app.domain.model.Account
 import com.kaasu.app.domain.model.Category
 import com.kaasu.app.domain.money.SpendRules
 import com.kaasu.app.domain.model.Transaction
+import com.kaasu.app.domain.repository.AccountRepository
 import com.kaasu.app.domain.repository.CategoryRepository
 import com.kaasu.app.domain.repository.TransactionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -39,6 +41,8 @@ data class DashboardUiState(
     val categoryBreakdown: List<CategorySpend> = emptyList(),
     val recentTransactions: List<Transaction> = emptyList(),
     val categoryMap: Map<Long, Category> = emptyMap(),
+    // Needed to name both ends of a transfer — "Union Bank → SBI Card" is derived, not stored.
+    val accountMap: Map<Long, Account> = emptyMap(),
     val displayName: String = "",
     val isLoading: Boolean = true
 )
@@ -47,6 +51,7 @@ data class DashboardUiState(
 class DashboardViewModel @Inject constructor(
     transactionRepository: TransactionRepository,
     categoryRepository: CategoryRepository,
+    accountRepository: AccountRepository,
     settingsDataStore: SettingsDataStore,
 ) : ViewModel() {
 
@@ -69,6 +74,8 @@ class DashboardViewModel @Inject constructor(
         val cycle = BudgetCycle.current(startDay, today)
         val previousCycleStart = BudgetCycle.current(startDay, today.minusMonths(1))
 
+        // combine() tops out at five flows and the accounts make six, so the first five are folded
+        // into one value and the accounts joined onto that.
         combine(
             transactionRepository.getByDateRange(cycle.startMillis, cycle.endMillis),
             transactionRepository.getByDateRange(previousCycleStart.startMillis, previousCycleStart.endMillis),
@@ -76,7 +83,9 @@ class DashboardViewModel @Inject constructor(
             settingsDataStore.monthlyBudgetInPaise,
             settingsDataStore.displayName
         ) { transactions, prevMonthTx, categories, budget, name ->
-            buildState(transactions, prevMonthTx, categories, budget, name, today, cycle, previousCycleStart)
+            Inputs(transactions, prevMonthTx, categories, budget, name)
+        }.combine(accountRepository.getAll()) { inputs, accounts ->
+            buildState(inputs, accounts, today, cycle, previousCycleStart)
         }
     }.stateIn(
         scope = viewModelScope,
@@ -84,16 +93,23 @@ class DashboardViewModel @Inject constructor(
         initialValue = DashboardUiState()
     )
 
+    /** The five flows combine() can take in one go, so the accounts can be joined on after. */
+    private data class Inputs(
+        val transactions: List<Transaction>,
+        val prevMonthTx: List<Transaction>,
+        val categories: List<Category>,
+        val budget: Long,
+        val displayName: String,
+    )
+
     private fun buildState(
-        transactions: List<Transaction>,
-        prevMonthTx: List<Transaction>,
-        categories: List<Category>,
-        budget: Long,
-        displayName: String,
+        inputs: Inputs,
+        accounts: List<Account>,
         today: LocalDate,
         cycle: BudgetCycle,
         previousCycle: BudgetCycle,
     ): DashboardUiState {
+        val (transactions, prevMonthTx, categories, budget, displayName) = inputs
         val todayStart = today.atStartOfDay(zone).toInstant().toEpochMilli()
         val todayEnd = today.atTime(23, 59, 59).atZone(zone).toInstant().toEpochMilli()
         val categoryMap = categories.associateBy { it.id }
@@ -167,6 +183,7 @@ class DashboardViewModel @Inject constructor(
             categoryBreakdown = categoryBreakdown,
             recentTransactions = recentTransactions,
             categoryMap = categoryMap,
+            accountMap = accounts.associateBy { it.id },
             displayName = displayName,
             isLoading = false
         )

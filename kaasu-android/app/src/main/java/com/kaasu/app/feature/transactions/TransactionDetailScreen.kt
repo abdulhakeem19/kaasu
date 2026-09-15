@@ -29,6 +29,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -61,6 +62,7 @@ import com.kaasu.app.core.util.formatRupees
 import com.kaasu.app.core.util.toComposeColor
 import com.kaasu.app.domain.model.Category
 import com.kaasu.app.domain.model.Transaction
+import com.kaasu.app.domain.model.Account
 import com.kaasu.app.domain.model.TransactionType
 import com.kaasu.app.domain.repository.SplitSlice
 import java.text.SimpleDateFormat
@@ -75,6 +77,7 @@ fun TransactionDetailScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showSplit by remember { mutableStateOf(false) }
+    var showTransferSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.isDeleted) {
         if (state.isDeleted) onBack()
@@ -169,6 +172,19 @@ fun TransactionDetailScreen(
                         )
                     }
 
+                    // ── NOT SPENDING AT ALL ──────────────────────────────────
+                    // A card bill or a move between the owner's accounts is not a purchase.
+                    // Counting it as one is what made a ₹2,399 subscription read as ₹4,798.
+                    if (tx.transferGroupId == null && tx.type != TransactionType.TRANSFER) {
+                        ActionButton(
+                            label = "Move between my accounts",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 2.dp),
+                            onClick = { showTransferSheet = true }
+                        )
+                    }
+
                     // ── MARK AS DUPLICATE ────────────────────────────────────
                     ActionButton(
                         label = "Mark as duplicate",
@@ -204,6 +220,20 @@ fun TransactionDetailScreen(
     }
 
     val tx = state.transaction
+
+    if (showTransferSheet && tx != null) {
+        MarkAsTransferSheet(
+            merchantName = tx.merchantName,
+            // Money cannot arrive in the account it left.
+            accounts = state.accounts.filter { it.id != tx.accountId },
+            onDismiss = { showTransferSheet = false },
+            onConfirm = { accountId, remember ->
+                showTransferSheet = false
+                viewModel.markAsTransfer(accountId, remember)
+            }
+        )
+    }
+
     if (showSplit && tx != null) {
         SplitSheet(
             totalInPaise = tx.amountInPaise,
@@ -685,6 +715,118 @@ private fun SplitRowEditor(
                     Text(category.name, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = if (isSel) KaasuColors.onForest else MaterialTheme.colorScheme.onSurface)
                 }
             }
+        }
+    }
+}
+
+/**
+ * Asks where the money actually went, and offers to remember the answer.
+ *
+ * "Where did this go?" rather than "is this a transfer?" — the owner knows the destination; the word
+ * transfer is our vocabulary, not theirs. The remember option is what makes this a one-time
+ * correction instead of a monthly chore: it writes a rule that catches the same payment next month.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MarkAsTransferSheet(
+    merchantName: String?,
+    accounts: List<Account>,
+    onDismiss: () -> Unit,
+    onConfirm: (accountId: Long?, rememberMerchant: Boolean) -> Unit
+) {
+    var selectedId by remember { mutableStateOf<Long?>(null) }
+    var alwaysApply by remember { mutableStateOf(merchantName?.isNotBlank() == true) }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Where did this money go?",
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                color = KaasuColors.ink
+            )
+            Text(
+                text = "Moving money between your own accounts, or paying a credit-card bill, " +
+                    "isn't spending — it stops counting toward your month.",
+                fontSize = 13.sp,
+                color = KaasuColors.muted
+            )
+
+            if (accounts.isEmpty()) {
+                Text(
+                    text = "No other account to move it to yet. Add one in Settings → Accounts.",
+                    fontSize = 13.sp,
+                    color = KaasuColors.muted
+                )
+            }
+
+            accounts.forEach { account ->
+                val isSelected = selectedId == account.id
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (isSelected) KaasuColors.forest.copy(alpha = 0.12f)
+                            else MaterialTheme.colorScheme.surface
+                        )
+                        .border(
+                            1.dp,
+                            if (isSelected) KaasuColors.forest else KaasuColors.border,
+                            RoundedCornerShape(12.dp)
+                        )
+                        .clickable { selectedId = account.id }
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = account.lastFourDigits
+                            ?.let { "${account.displayName} ·· $it" }
+                            ?: account.displayName,
+                        fontSize = 14.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        color = KaasuColors.ink,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (isSelected) {
+                        Text(text = "✓", fontSize = 15.sp, color = KaasuColors.forest)
+                    }
+                }
+            }
+
+            if (!merchantName.isNullOrBlank()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { alwaysApply = !alwaysApply }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Checkbox(checked = alwaysApply, onCheckedChange = { alwaysApply = it })
+                    Text(
+                        text = "Always treat \"$merchantName\" this way",
+                        fontSize = 13.sp,
+                        color = KaasuColors.ink,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            ActionButton(
+                label = "Save",
+                active = true,
+                modifier = Modifier.fillMaxWidth(),
+                // The destination is optional: knowing it was not spending is already the fix, and
+                // insisting on an account the owner may not track would leave the total wrong.
+                onClick = { onConfirm(selectedId, alwaysApply) }
+            )
         }
     }
 }
