@@ -15,6 +15,25 @@ Updated with each push-worthy commit. The goal is to always know the path we cam
 
 ---
 
+## [1.1.1 — Verifying the official build] — 2026-09-15
+### Added
+- **A way to tell whether this is the real Kaasu.** With no Play Store listing, nothing vouches for
+  a download of an app that reads bank messages. The signing certificate does: Android refuses an
+  update signed by any other key, so anyone can rebuild the source but nobody else can produce this
+  signature. The fingerprint is published in the README, and Settings → About shows the running
+  build's key and whether it matches.
+- **Build provenance** on every release — GitHub attests that the APK came from this repository,
+  workflow and commit, which neither a checksum nor a signature can establish. Verify with
+  `gh attestation verify kaasu-<version>.apk --repo abdulhakeem19/kaasu`.
+
+### Notes
+- The in-app check reports which build is running; it is not proof the build is honest. This source
+  is public, so a repackaged app could be altered to claim anything. The check that cannot be
+  patched out is `apksigner verify --print-certs`, run on the APK before installing it. Both the
+  About dialog and the README say so rather than implying otherwise.
+
+---
+
 ## [1.1.0 — Money correctness: transfers, balances, and a home screen that works] — 2026-09-15
 ### Fixed
 - **A transfer was being counted as spending.** A ₹2,399 subscription auto-debited on the SBI card,
