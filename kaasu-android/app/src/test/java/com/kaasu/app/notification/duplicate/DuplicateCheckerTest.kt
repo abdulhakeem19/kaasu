@@ -211,6 +211,9 @@ class DuplicateCheckerTest {
         override suspend fun update(t: Transaction) = Unit
         override suspend fun delete(t: Transaction) = Unit
         override suspend fun deleteById(id: Long) = Unit
+        override suspend fun getByTransferGroup(groupId: String): List<Transaction> = emptyList()
+        override fun observeHalfLinkedTransfers(): Flow<List<Transaction>> = throw UnsupportedOperationException()
+        override suspend fun deleteByTransferGroup(groupId: String) = Unit
         override suspend fun deleteAll() = Unit
     }
 }

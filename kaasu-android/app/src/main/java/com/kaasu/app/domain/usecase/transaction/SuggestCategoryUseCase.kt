@@ -19,7 +19,7 @@ class SuggestCategoryUseCase @Inject constructor(
         sourceAppPackage: String?,
         categories: List<Category>
     ): Long? {
-        ruleEngine.classify(merchantName, sourceAppPackage)?.let { return it }
+        ruleEngine.classifyCategory(merchantName, sourceAppPackage)?.let { return it }
 
         val name = merchantName?.lowercase() ?: return null
         val byName = categories.associateBy { it.name.lowercase() }

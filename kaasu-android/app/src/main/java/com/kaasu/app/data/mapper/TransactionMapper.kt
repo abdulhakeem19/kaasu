@@ -3,6 +3,7 @@ package com.kaasu.app.data.mapper
 import com.kaasu.app.core.database.entity.TransactionEntity
 import com.kaasu.app.domain.model.Transaction
 import com.kaasu.app.domain.model.TransactionType
+import com.kaasu.app.domain.model.TransferRole
 
 fun TransactionEntity.toDomain(): Transaction = Transaction(
     id = id,
@@ -27,7 +28,11 @@ fun TransactionEntity.toDomain(): Transaction = Transaction(
     accountId = accountId,
     isRecurring = isRecurring,
     parentId = parentId,
-    isDuplicate = isDuplicate
+    isDuplicate = isDuplicate,
+    transferGroupId = transferGroupId,
+    // Tolerant of junk: an unrecognised role reads as null rather than crashing the whole list.
+    transferRole = TransferRole.fromStorage(transferRole),
+    counterpartAccountId = counterpartAccountId
 )
 
 fun Transaction.toEntity(rawText: String? = null): TransactionEntity = TransactionEntity(
@@ -54,5 +59,8 @@ fun Transaction.toEntity(rawText: String? = null): TransactionEntity = Transacti
     accountId = accountId,
     isRecurring = isRecurring,
     parentId = parentId,
-    isDuplicate = isDuplicate
+    isDuplicate = isDuplicate,
+    transferGroupId = transferGroupId,
+    transferRole = transferRole?.name,
+    counterpartAccountId = counterpartAccountId
 )

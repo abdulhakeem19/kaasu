@@ -107,10 +107,12 @@ fun AddEditTransactionScreen(
     val isSaveEnabled = rawInput != "0" && rawInput.isNotBlank() && rawInput.toDoubleOrNull() != null
 
     var showAccountPicker by remember { mutableStateOf(false) }
+    var showToAccountPicker by remember { mutableStateOf(false) }
     var showCategoryPicker by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
 
     val selectedAccount = state.accounts.firstOrNull { it.id == state.accountId }
+    val selectedToAccount = state.accounts.firstOrNull { it.id == state.toAccountId }
 
     Box(
         modifier = Modifier
@@ -163,7 +165,12 @@ fun AddEditTransactionScreen(
                     onMerchantChange = viewModel::onMerchantChange,
                     onAccountClick = { showAccountPicker = true },
                     onDateClick = { showDatePicker = true },
-                    onNoteChange = viewModel::onNoteChange
+                    onNoteChange = viewModel::onNoteChange,
+                    isTransfer = state.isTransfer,
+                    toAccountLabel = selectedToAccount?.let { acc ->
+                        acc.lastFourDigits?.let { "${acc.displayName} ·· $it" } ?: acc.displayName
+                    },
+                    onToAccountClick = { showToAccountPicker = true },
                 )
 
                 // Offer to remember the rename for this merchant everywhere + future captures
@@ -195,6 +202,19 @@ fun AddEditTransactionScreen(
                 showAccountPicker = false
             },
             onDismiss = { showAccountPicker = false }
+        )
+    }
+
+    if (showToAccountPicker) {
+        AccountPickerSheet(
+            // The account the money left is not somewhere it can also arrive.
+            accounts = state.accounts.filter { it.id != state.accountId },
+            selectedId = state.toAccountId,
+            onSelect = {
+                viewModel.onToAccountChange(it)
+                showToAccountPicker = false
+            },
+            onDismiss = { showToAccountPicker = false }
         )
     }
 
@@ -499,7 +519,11 @@ private fun DetailsCard(
     onMerchantChange: (String) -> Unit,
     onAccountClick: () -> Unit,
     onDateClick: () -> Unit,
-    onNoteChange: (String) -> Unit
+    onNoteChange: (String) -> Unit,
+    // A transfer has two ends and no payee, so it swaps the "Payee" row for a second account.
+    isTransfer: Boolean = false,
+    toAccountLabel: String? = null,
+    onToAccountClick: () -> Unit = {},
 ) {
     val dateText = remember(transactionTime) {
         SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(Date(transactionTime))
@@ -515,18 +539,20 @@ private fun DetailsCard(
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(18.dp))
             .padding(horizontal = 14.dp)
     ) {
-        // Payee / merchant — editable
-        EditableRow(
-            label = "Payee",
-            value = merchantName,
-            placeholder = "Who / where",
-            onValueChange = onMerchantChange,
-            showDivider = true
-        )
+        // Moving money between your own accounts has no payee — asking for one invites a name
+        // that then reads like a shop in the transaction list.
+        if (!isTransfer) {
+            EditableRow(
+                label = "Payee",
+                value = merchantName,
+                placeholder = "Who / where",
+                onValueChange = onMerchantChange,
+                showDivider = true
+            )
+        }
 
-        // Account row — opens account picker
         DetailsRow(
-            label = "Account",
+            label = if (isTransfer) "From" else "Account",
             value = accountLabel ?: "Select account",
             isPlaceholder = accountLabel == null,
             trailingContent = {
@@ -540,6 +566,24 @@ private fun DetailsCard(
             showDivider = true,
             onClick = onAccountClick
         )
+
+        if (isTransfer) {
+            DetailsRow(
+                label = "To",
+                value = toAccountLabel ?: "Select account",
+                isPlaceholder = toAccountLabel == null,
+                trailingContent = {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                },
+                showDivider = true,
+                onClick = onToAccountClick
+            )
+        }
 
         // Date row — opens date picker
         DetailsRow(

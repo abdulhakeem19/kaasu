@@ -191,9 +191,6 @@ object DatabaseSeeder : RoomDatabase.Callback() {
             Seed("Electricity", "electricity",  "Bills"),
             Seed("Broadband",   "broadband",    "Bills"),
             Seed("Insurance",   "insurance",    "Bills"),
-            // Credit-card bill payments (merchant is typically "<Bank> Credit Card")
-            Seed("Credit Card", "credit card",  "Bills"),
-            Seed("Card Bill",   "card bill",     "Bills"),
             // Income keywords (match on merchantName from notification)
             Seed("Salary",      "salary",       "Salary"),
             Seed("Freelance",   "freelance",    "Freelance"),
@@ -206,6 +203,19 @@ object DatabaseSeeder : RoomDatabase.Callback() {
                    SELECT ?, ?, 'CONTAINS', id, NULL, NULL, 10, 1, 1, ?, ?
                    FROM categories WHERE name = ? LIMIT 1""",
                 arrayOf<Any?>(rule.name, rule.matchText, now, now, rule.category)
+            )
+        }
+
+        // Credit-card bill payments are not purchases — they settle a card whose purchases were
+        // each already recorded. These used to be filed under Bills, which made the same money
+        // count twice: once on the card, once when the bill was paid. They carry no category and
+        // override the type instead. Migration 8→9 applies the same correction to existing installs.
+        listOf("credit card" to "Credit Card Bill", "card bill" to "Card Bill").forEach { (match, name) ->
+            db.execSQL(
+                """INSERT INTO rules (name, matchText, matchType, categoryId, transactionType,
+                   sourceAppPackage, priority, isSystem, isActive, createdAt, updatedAt)
+                   VALUES (?, ?, 'CONTAINS', NULL, 'TRANSFER', NULL, 20, 1, 1, ?, ?)""",
+                arrayOf<Any?>(name, match, now, now)
             )
         }
     }

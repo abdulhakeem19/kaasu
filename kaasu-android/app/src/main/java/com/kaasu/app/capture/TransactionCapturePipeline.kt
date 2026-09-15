@@ -9,10 +9,12 @@ import com.kaasu.app.domain.model.Account
 import com.kaasu.app.domain.model.AccountType
 import com.kaasu.app.domain.model.Transaction
 import com.kaasu.app.domain.model.TransactionType
+import com.kaasu.app.domain.model.TransferRole
 import com.kaasu.app.domain.repository.AccountRepository
 import com.kaasu.app.domain.repository.TransactionRepository
 import com.kaasu.app.notification.classifier.CategoryRuleEngine
 import com.kaasu.app.notification.duplicate.DuplicateChecker
+import com.kaasu.app.notification.filter.CreditCardBillDetector
 import com.kaasu.app.notification.model.ParsedTransaction
 import com.kaasu.app.notification.model.RawNotification
 import com.kaasu.app.notification.parser.AccountNotificationParser
@@ -86,15 +88,18 @@ class TransactionCapturePipeline @Inject constructor(
 
         // Explicit rules win. When none match, reuse whatever category this merchant was last
         // filed under — so categorising one "SWIGGY" transaction by hand teaches every later one.
-        val categoryId = categoryRuleEngine.classify(parsed.merchantName, raw.packageName)
+        val ruleOutcome = categoryRuleEngine.classify(parsed.merchantName, raw.packageName)
+        val categoryId = ruleOutcome.categoryId
             ?: parsed.merchantName?.let { transactionRepository.getLearnedCategoryIdByMerchant(it) }
 
         val accountId = resolveAccountId(parsed, appName, accountRepository, transactionRepository)
 
         // A move between the owner's own accounts arrives as two unrelated messages — the sending
         // bank's debit and the receiving bank's credit — and was stored as an expense plus an
-        // income, inflating both. Link them into one labelled transfer.
-        val transferLabel = linkInternalTransfer(parsed, accountId)
+        // income, inflating both. Failing that, a card-bill payment is the same movement with only
+        // one leg ever announced.
+        val transferLink = linkInternalTransfer(parsed, accountId)
+            ?: detectCardBillPayment(parsed, accountId)
 
         val now = System.currentTimeMillis()
         val transaction = parsed.toTransaction(
@@ -104,10 +109,27 @@ class TransactionCapturePipeline @Inject constructor(
             accountId = accountId,
             now = now
         ).let { tx ->
-            if (transferLabel != null) {
-                tx.copy(type = TransactionType.TRANSFER, isTransfer = true, merchantName = transferLabel)
-            } else {
-                tx
+            when {
+                transferLink != null -> tx.copy(
+                    type = TransactionType.TRANSFER,
+                    isTransfer = true,
+                    // The arrow is no longer written into the name. "IDFC FIRST → Union Bank" as a
+                    // merchant was unqueryable and destroyed whatever the bank actually said; the
+                    // label is now derived from the two account ids at display time.
+                    transferGroupId = transferLink.groupId,
+                    transferRole = transferLink.role,
+                    counterpartAccountId = transferLink.counterpartAccountId,
+                    // A transfer is not spending, so it carries no spending category.
+                    categoryId = null,
+                )
+                // A rule may declare the type outright (the stock "credit card" rule does), which
+                // is how a bill payment stops being an expense even when no card account exists.
+                ruleOutcome.typeOverride != null -> tx.copy(
+                    type = ruleOutcome.typeOverride,
+                    isTransfer = ruleOutcome.typeOverride == TransactionType.TRANSFER,
+                    categoryId = if (ruleOutcome.typeOverride == TransactionType.TRANSFER) null else categoryId,
+                )
+                else -> tx
             }
         }
 
@@ -154,7 +176,19 @@ class TransactionCapturePipeline @Inject constructor(
     }
 
     /**
-     * Detects a move between two of the owner's own accounts and labels both legs.
+     * One movement between two of the owner's own accounts, as seen from one leg.
+     *
+     * [counterpartAccountId] is display and repair only. Each row moves only its own account, so a
+     * complete group nets to zero — summing the counterpart too would double the movement.
+     */
+    private data class TransferLink(
+        val groupId: String,
+        val role: TransferRole,
+        val counterpartAccountId: Long?,
+    )
+
+    /**
+     * Detects a move between two of the owner's own accounts and groups both legs.
      *
      * Each bank announces only its own half: IDFC says "A/c XX3956 debited … hakeema188@okaxis
      * credited", Union Bank says "A/c *0913 Credited for Rs:10.00". Nothing connects them, so the
@@ -163,11 +197,15 @@ class TransactionCapturePipeline @Inject constructor(
      *
      * The signature of a transfer is a debit and a credit of the identical amount, landing on two
      * different accounts of the owner's within [TRANSFER_WINDOW_MS]. When the second leg arrives,
-     * the first is rewritten too, so both read "IDFC FIRST → Union Bank".
+     * the first is rewritten to join the same group.
      *
-     * Returns that label for the incoming transaction, or null when this is an ordinary payment.
+     * Both legs are kept as separate rows on purpose. Merging them would break dedup — each carries
+     * its own rawText, which is what DuplicateChecker keys on, so a redelivered SMS would look new.
      */
-    private suspend fun linkInternalTransfer(parsed: ParsedTransaction, accountId: Long?): String? {
+    private suspend fun linkInternalTransfer(
+        parsed: ParsedTransaction,
+        accountId: Long?,
+    ): TransferLink? {
         if (accountId == null) return null
         val counterpartType = when (parsed.type) {
             TransactionType.EXPENSE -> TransactionType.INCOME
@@ -182,26 +220,60 @@ class TransactionCapturePipeline @Inject constructor(
         ).firstOrNull { it.accountId != null && it.accountId != accountId && !it.isTransfer }
             ?: return null
 
-        val names = accountRepository.getAll().first().associate { it.id to it.displayName }
-        val thisName = names[accountId] ?: return null
-        val otherName = names[counterpart.accountId] ?: return null
-
         // Direction reads from the money's point of view: whichever leg is the debit is the "from".
-        val label = if (parsed.type == TransactionType.EXPENSE) {
-            "$thisName → $otherName"
-        } else {
-            "$otherName → $thisName"
-        }
+        val thisRole =
+            if (parsed.type == TransactionType.EXPENSE) TransferRole.OUT else TransferRole.IN
+        val groupId = java.util.UUID.randomUUID().toString()
 
         transactionRepository.update(
             counterpart.copy(
                 type = TransactionType.TRANSFER,
                 isTransfer = true,
-                merchantName = label,
+                transferGroupId = groupId,
+                transferRole = thisRole.opposite,
+                counterpartAccountId = accountId,
+                categoryId = null,
                 updatedAt = System.currentTimeMillis(),
             )
         )
-        return label
+        return TransferLink(groupId, thisRole, counterpart.accountId)
+    }
+
+    /**
+     * A credit-card bill paid from a bank account, which arrives as a single message.
+     *
+     * Unlike a bank-to-bank move there is usually no second leg to pair with — the card seldom
+     * announces that its bill was settled — so this opens a group with one leg. That is expected,
+     * not broken: the "Where did this go?" prompt offers to complete it later, and the movement is
+     * already excluded from spending in the meantime.
+     *
+     * Requires an existing CREDIT_CARD account so this cannot fire on someone with no card
+     * tracked; a false positive would silently erase a genuine expense from the month.
+     */
+    private suspend fun detectCardBillPayment(
+        parsed: ParsedTransaction,
+        accountId: Long?,
+    ): TransferLink? {
+        if (accountId == null) return null
+        if (parsed.type != TransactionType.EXPENSE) return null
+        if (!CreditCardBillDetector.isBillPayment(parsed.rawText)) return null
+
+        val cards = accountRepository.getAll().first()
+            .filter { it.accountType == AccountType.CREDIT_CARD && it.id != accountId }
+        if (cards.isEmpty()) return null
+
+        // Which card: the last-4 in the message, else the only card there is. Anything more
+        // ambiguous is left alone rather than guessed at.
+        val lastFour = AccountNotificationParser.extractLastFour(parsed.rawText)
+        val card = cards.firstOrNull { it.lastFourDigits != null && it.lastFourDigits == lastFour }
+            ?: cards.singleOrNull()
+            ?: return null
+
+        return TransferLink(
+            groupId = java.util.UUID.randomUUID().toString(),
+            role = TransferRole.OUT,
+            counterpartAccountId = card.id,
+        )
     }
 
     // Resolves which account a captured transaction belongs to, auto-creating one when a new

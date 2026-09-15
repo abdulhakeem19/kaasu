@@ -9,6 +9,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.kaasu.app.accessibility.scraper.ScraperRegistry
 import com.kaasu.app.backfill.TransactionBackfillManager
+import com.kaasu.app.backfill.TransferBackfillManager
 import com.kaasu.app.core.backup.BackupManager
 import com.kaasu.app.core.database.dao.AppSourceDao
 import com.kaasu.app.core.database.dao.SmsSenderDao
@@ -43,6 +44,7 @@ class SettingsViewModel @Inject constructor(
     private val smsSenderDao: SmsSenderDao,
     private val backupManager: BackupManager,
     private val backfillManager: TransactionBackfillManager,
+    private val transferBackfillManager: TransferBackfillManager,
     private val scraperRegistry: ScraperRegistry,
     private val csvExporter: CsvExporter,
     @ApplicationContext private val appContext: Context,
@@ -118,12 +120,19 @@ class SettingsViewModel @Inject constructor(
         if (_isRescanning.value) return
         viewModelScope.launch {
             _isRescanning.value = true
-            runCatching { backfillManager.run() }
-                .onSuccess { r ->
+            runCatching {
+                // Transfers captured before transfer groups existed recorded their direction only
+                // as an arrow inside the merchant name, which no total could act on. Repairing them
+                // belongs to the same re-scan: both heal history the current code would get right.
+                val transfers = transferBackfillManager.run()
+                backfillManager.run() to transfers
+            }
+                .onSuccess { (r, t) ->
                     val parts = buildList {
                         if (r.merchantsFilled > 0) add("${r.merchantsFilled} name${if (r.merchantsFilled == 1) "" else "s"}")
                         if (r.categoriesFilled > 0) add("${r.categoriesFilled} categor${if (r.categoriesFilled == 1) "y" else "ies"}")
                         if (r.notesFilled > 0) add("${r.notesFilled} note${if (r.notesFilled == 1) "" else "s"}")
+                        if (t.grouped > 0) add("${t.grouped} transfer leg${if (t.grouped == 1) "" else "s"}")
                     }
                     _message.emit(
                         if (parts.isEmpty()) "Re-scanned ${r.scanned} transactions — nothing new to fill"
