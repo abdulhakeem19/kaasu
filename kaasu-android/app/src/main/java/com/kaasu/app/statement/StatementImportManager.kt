@@ -75,7 +75,14 @@ class StatementImportManager @Inject constructor(
     }
 
     /** Inserts the "new" subset from a previously computed [ImportResult]. Returns how many were inserted. */
-    suspend fun commit(result: ImportResult): Int {
+    /**
+     * Writes the previewed rows.
+     *
+     * [accountId] matters more than it looks: without it every imported row belongs to no account,
+     * so it counts toward the month's spending but moves no balance — the statement would make the
+     * totals right and the balances wrong. The screen asks which account the file came from.
+     */
+    suspend fun commit(result: ImportResult, accountId: Long? = null): Int {
         val now = System.currentTimeMillis()
         for (item in result.newItems) {
             val transaction = Transaction(
@@ -92,6 +99,7 @@ class StatementImportManager @Inject constructor(
                 updatedAt = now,
                 isManual = false,
                 note = null,
+                accountId = accountId,
             )
             transactionRepository.insertParsed(transaction, rawText = item.rawLineText)
         }

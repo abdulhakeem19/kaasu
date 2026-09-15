@@ -29,6 +29,25 @@ interface AccountDao {
     @Query("DELETE FROM accounts WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    /**
+     * Retires an account without destroying the money on it.
+     *
+     * A hard delete leaves `transactions.accountId` pointing at an id that no longer exists, so
+     * those rows silently drop out of every per-account figure with no error anywhere — the money
+     * appears to have never happened. Deactivating keeps the history intact and readable.
+     */
+    @Query("UPDATE accounts SET isActive = 0 WHERE id = :id")
+    suspend fun deactivate(id: Long)
+
+    /**
+     * Records what the bank itself last said this balance was.
+     *
+     * Advisory: shown next to the derived figure so a disagreement is visible. Never used as the
+     * balance — that would quietly paper over every message Kaasu failed to capture.
+     */
+    @Query("UPDATE accounts SET lastStatedBalanceInPaise = :balanceInPaise, lastStatedBalanceAt = :at WHERE id = :id")
+    suspend fun setLastStatedBalance(id: Long, balanceInPaise: Long, at: Long)
+
     @Query("DELETE FROM accounts")
     suspend fun deleteAll()
 
