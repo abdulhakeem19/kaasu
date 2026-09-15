@@ -2,10 +2,10 @@ package com.kaasu.app.navigation
 
 sealed class Screen(val route: String) {
     // Onboarding graph
+    // Onboarding is a single screen. Three more routes were declared here — privacy_promise,
+    // notification_permission and budget_setup — with no composable() registered against any of
+    // them, so navigating to one would have thrown rather than shown anything.
     data object Onboarding : Screen("onboarding")
-    data object PrivacyPromise : Screen("privacy_promise")
-    data object NotificationPermission : Screen("notification_permission")
-    data object BudgetSetup : Screen("budget_setup")
 
     // Main graph (bottom nav)
     data object Dashboard : Screen("dashboard")
