@@ -82,7 +82,7 @@ class StatementImportManager @Inject constructor(
                 amountInPaise = item.amountInPaise,
                 type = item.direction,
                 merchantName = item.description,
-                categoryId = categoryRuleEngine.classify(item.description, sourceAppPackage = null),
+                categoryId = categoryRuleEngine.classifyCategory(item.description, sourceAppPackage = null),
                 sourceAppPackage = SOURCE_APP_PACKAGE,
                 sourceAppName = "${result.bankDisplayName} Statement",
                 paymentMode = null,

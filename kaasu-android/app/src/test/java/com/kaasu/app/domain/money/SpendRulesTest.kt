@@ -2,6 +2,7 @@ package com.kaasu.app.domain.money
 
 import com.kaasu.app.domain.model.Transaction
 import com.kaasu.app.domain.model.TransactionType
+import com.kaasu.app.domain.model.TransferRole
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -14,6 +15,7 @@ class SpendRulesTest {
         amountInPaise: Long = 10_000L,
         isIgnored: Boolean = false,
         isDuplicate: Boolean = false,
+        transferRole: TransferRole? = null,
     ) = Transaction(
         id = 0,
         amountInPaise = amountInPaise,
@@ -38,6 +40,7 @@ class SpendRulesTest {
         isRecurring = false,
         parentId = null,
         isDuplicate = isDuplicate,
+        transferRole = transferRole,
     )
 
     // ── The bug this object exists to kill ────────────────────────────────────
@@ -110,6 +113,20 @@ class SpendRulesTest {
         val transfer = tx(TransactionType.TRANSFER)
         assertTrue(SpendRules.isOutflow(transfer))
         assertFalse(SpendRules.isSpend(transfer))
+    }
+
+    @Test
+    fun `only the leg the money left displays as an outflow`() {
+        val out = tx(TransactionType.TRANSFER, transferRole = TransferRole.OUT)
+        val into = tx(TransactionType.TRANSFER, transferRole = TransferRole.IN)
+        assertTrue(SpendRules.isOutflow(out))
+        assertFalse("the receiving account gained the money, it did not lose it", SpendRules.isOutflow(into))
+    }
+
+    @Test
+    fun `a transfer from before roles existed still displays as an outflow`() {
+        // Legacy rows have no role; the old behaviour is the safer default for them.
+        assertTrue(SpendRules.isOutflow(tx(TransactionType.TRANSFER, transferRole = null)))
     }
 
     @Test

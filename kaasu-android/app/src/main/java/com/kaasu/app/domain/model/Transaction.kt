@@ -24,5 +24,10 @@ data class Transaction(
     val accountId: Long? = null,
     val isRecurring: Boolean = false,
     val parentId: Long? = null,
-    val isDuplicate: Boolean = false
+    val isDuplicate: Boolean = false,
+    // Set on both legs of a movement between the owner's own accounts. See TransferRole.
+    val transferGroupId: String? = null,
+    val transferRole: TransferRole? = null,
+    // The account at the other end — for showing "Savings → SBI Card". Never summed.
+    val counterpartAccountId: Long? = null
 )

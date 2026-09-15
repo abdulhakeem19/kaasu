@@ -10,7 +10,8 @@ import androidx.room.PrimaryKey
         Index("transactionTime"),
         Index("categoryId"),
         Index("sourceAppPackage"),
-        Index("rawTextHash")
+        Index("rawTextHash"),
+        Index("transferGroupId")
     ]
 )
 data class TransactionEntity(
@@ -39,5 +40,15 @@ data class TransactionEntity(
     // When set, this is one slice of a split; the parent (isIgnored=true) holds the original payment.
     val parentId: Long? = null,
     // User marked this as a duplicate; also set isIgnored=true so it drops out of lists and totals.
-    val isDuplicate: Boolean = false
+    val isDuplicate: Boolean = false,
+    // The two legs of one movement between the owner's own accounts share this id. Null for
+    // ordinary payments. Kept as a group rather than a link because each bank announces its own
+    // leg separately and each leg needs to stay independently de-duplicable.
+    val transferGroupId: String? = null,
+    // "OUT" or "IN" — which end of the movement this row is. A group may legitimately have only
+    // one leg: a credit card usually says nothing when its bill is paid.
+    val transferRole: String? = null,
+    // The account at the other end. Display and repair only — never summed, since each row already
+    // moves its own account and summing both ends would double the movement.
+    val counterpartAccountId: Long? = null
 )
