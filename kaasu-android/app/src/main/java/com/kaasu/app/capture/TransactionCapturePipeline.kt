@@ -18,6 +18,7 @@ import com.kaasu.app.notification.filter.CreditCardBillDetector
 import com.kaasu.app.notification.model.ParsedTransaction
 import com.kaasu.app.notification.model.RawNotification
 import com.kaasu.app.notification.parser.AccountNotificationParser
+import com.kaasu.app.notification.parser.BalanceParser
 import com.kaasu.app.notification.parser.TransactionParser
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
@@ -59,7 +60,10 @@ class TransactionCapturePipeline @Inject constructor(
         noteOverride: String? = null,
         coarseBudget: MutableMap<String, Int>? = null,
     ): Boolean {
-        var parsed = transactionParser.parse(raw) ?: return false
+        // Not a transaction — but a message can still state a balance without any money having
+        // moved, and those are the most reliable balance statements a bank sends. They used to be
+        // dropped here along with everything else the parser did not recognise.
+        var parsed = transactionParser.parse(raw) ?: return processBalanceOnly(raw)
 
         // The screen-scrape channel reads the merchant straight off the row, so re-deriving it from
         // a rebuilt sentence would only lose detail — MerchantParser caps a name at three words,
@@ -142,7 +146,36 @@ class TransactionCapturePipeline @Inject constructor(
         }
 
         transactionRepository.insertParsed(transaction, rawText = parsed.rawText)
+
+        // Banks state the balance in the same breath as the debit. Free ground truth, so it is
+        // recorded alongside — never used as the balance, only shown beside the derived figure.
+        recordStatedBalance(parsed.rawText, accountId, parsed.transactionTime)
         return true
+    }
+
+    /**
+     * A message that states a balance and nothing else.
+     *
+     * Returns false either way: nothing was inserted, and the caller's "did this become a
+     * transaction?" answer must stay honest. The balance is a side effect, not a capture.
+     */
+    private suspend fun processBalanceOnly(raw: RawNotification): Boolean {
+        val text = raw.fullText()
+        if (!BalanceParser.isBalanceOnly(text)) return false
+
+        val lastFour = AccountNotificationParser.extractLastFour(text) ?: return false
+        // Deliberately does not create an account: a balance alone says nothing about what kind of
+        // account it is, and inventing one from a bare figure would litter the account list.
+        val account = accountRepository.getByLastFour(lastFour).singleOrNull() ?: return false
+
+        recordStatedBalance(text, account.id, raw.postedAt)
+        return false
+    }
+
+    private suspend fun recordStatedBalance(rawText: String?, accountId: Long?, at: Long) {
+        if (accountId == null) return
+        val balance = BalanceParser.parseBalanceInPaise(rawText) ?: return
+        accountRepository.setLastStatedBalance(accountId, balance, at)
     }
 
     /**

@@ -36,6 +36,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kaasu.app.ui.theme.KaasuColors
 import com.kaasu.app.core.util.formatRupees
+import com.kaasu.app.domain.model.Account
 import com.kaasu.app.domain.model.TransactionType
 import com.kaasu.app.statement.model.StatementLineItem
 import java.time.format.DateTimeFormatter
@@ -83,6 +84,9 @@ fun ImportStatementScreen(
                 duplicateCount = s.result.duplicateCount,
                 items = s.result.newItems,
                 dateFmt = dateFmt,
+                accounts = s.accounts,
+                selectedAccountId = s.selectedAccountId,
+                onAccountChange = viewModel::onAccountChange,
                 onCommit = viewModel::commit
             )
             is ImportStatementUiState.Committed ->
@@ -151,6 +155,9 @@ private fun PreviewContent(
     duplicateCount: Int,
     items: List<StatementLineItem>,
     dateFmt: DateTimeFormatter,
+    accounts: List<Account>,
+    selectedAccountId: Long?,
+    onAccountChange: (Long?) -> Unit,
     onCommit: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -162,6 +169,59 @@ private fun PreviewContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 2.dp)
             )
+        }
+
+        // Which account this statement belongs to. Without it these rows would count toward the
+        // month's spending but move no balance, leaving the totals right and the balances wrong.
+        if (accounts.isNotEmpty() && items.isNotEmpty()) {
+            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                Text(
+                    "Which account is this statement for?",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = KaasuColors.ink
+                )
+                accounts.forEach { account ->
+                    val isSelected = selectedAccountId == account.id
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (isSelected) KaasuColors.forest.copy(alpha = 0.12f)
+                                else MaterialTheme.colorScheme.surface
+                            )
+                            .border(
+                                1.dp,
+                                if (isSelected) KaasuColors.forest else KaasuColors.border,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable { onAccountChange(account.id) }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = account.lastFourDigits
+                                ?.let { "${account.displayName} ·· $it" }
+                                ?: account.displayName,
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = KaasuColors.ink,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (isSelected) Text("✓", fontSize = 14.sp, color = KaasuColors.forest)
+                    }
+                }
+                if (selectedAccountId == null) {
+                    Text(
+                        "Pick one so these transactions move the right balance.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                }
+            }
         }
 
         LazyColumn(
@@ -185,6 +245,9 @@ private fun PreviewContent(
             Box(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                 Button(
                     onClick = onCommit,
+                    // An account-less import would silently leave balances wrong, so the button
+                    // waits rather than quietly doing the half-right thing.
+                    enabled = accounts.isEmpty() || selectedAccountId != null,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Commit import · $newCount transaction${if (newCount == 1) "" else "s"}")

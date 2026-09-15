@@ -46,6 +46,9 @@ import com.kaasu.app.core.bank.BankRegistry
 import com.kaasu.app.core.util.toColorHex
 import com.kaasu.app.core.util.toComposeColor
 import com.kaasu.app.domain.model.Account
+import com.kaasu.app.core.util.toAmountDisplay
+import com.kaasu.app.ui.theme.KaasuColors
+import com.kaasu.app.domain.model.AccountBalance
 import com.kaasu.app.domain.model.AccountType
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -127,13 +130,24 @@ fun AccountsScreen(
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                items(state.accounts, key = { it.id }) { account ->
+                // Accounts first, then whatever could not be placed. The unassigned bucket is last
+                // because it is a prompt to fix something, not an account.
+                items(
+                    state.balances.filterNot { it.isUnassigned },
+                    key = { it.account?.id ?: 0L }
+                ) { balance ->
+                    val account = balance.account ?: return@items
                     AccountRow(
-                        account = account,
+                        balance = balance,
                         onClick = { onEditClick(account.id) },
-                        onDelete = { deleteTarget = account }
+                        onDelete = { deleteTarget = account },
+                        onUseStatedBalance = { viewModel.useStatedBalance(account.id) }
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                }
+
+                state.balances.firstOrNull { it.isUnassigned }?.let { unassigned ->
+                    item { UnassignedRow(unassigned) }
                 }
             }
         }
@@ -142,10 +156,12 @@ fun AccountsScreen(
 
 @Composable
 private fun AccountRow(
-    account: Account,
+    balance: AccountBalance,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onUseStatedBalance: () -> Unit
 ) {
+    val account = balance.account ?: return
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -192,6 +208,52 @@ private fun AccountRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            if (balance.isKnown) {
+                Text(
+                    // A card's balance is a debt, so it reads as an amount outstanding rather than
+                    // as a negative number the owner has to mentally flip.
+                    text = if (balance.isCreditCard) {
+                        "Outstanding ${balance.outstandingInPaise.toAmountDisplay()}"
+                    } else {
+                        balance.balanceInPaise.toAmountDisplay()
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (balance.balanceInPaise < 0 && !balance.isCreditCard) {
+                        KaasuColors.expense
+                    } else {
+                        KaasuColors.ink
+                    }
+                )
+            } else {
+                // Not "₹0" — that would be a confident claim about money Kaasu knows nothing about.
+                Text(
+                    text = "Set opening balance",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = KaasuColors.forest
+                )
+            }
+
+            // The bank already told us what it thinks. Showing the disagreement is the entire
+            // reconciliation feature; one tap accepts the bank's number and re-anchors.
+            val drift = balance.driftInPaise
+            if (drift != null && drift != 0L) {
+                val stated = account.lastStatedBalanceInPaise ?: 0L
+                Text(
+                    text = "Your bank said ${stated.toAmountDisplay()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Use bank's figure",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = KaasuColors.forest,
+                    modifier = Modifier.clickable(onClick = onUseStatedBalance)
+                )
+            }
         }
 
         IconButton(onClick = onDelete) {
@@ -201,6 +263,40 @@ private fun AccountRow(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+/**
+ * Transactions Kaasu captured but could not attribute to any account.
+ *
+ * Usually a message with no account tail, or the same last four digits at two banks. Without a row
+ * of its own this money silently disappears from the account view, which reads as having less than
+ * you do.
+ */
+@Composable
+private fun UnassignedRow(balance: AccountBalance) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Text(
+            text = "Not linked to an account",
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium
+        )
+        Text(
+            text = "${balance.transactionCount} transaction${if (balance.transactionCount == 1) "" else "s"} " +
+                "· ${balance.balanceInPaise.toAmountDisplay()}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "Open one to pick its account, or add the account's last 4 digits so Kaasu can link it.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

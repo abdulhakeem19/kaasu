@@ -83,4 +83,35 @@ object SpendRules {
     /** Total of [isIncome] rows. Refunds are not income; they reduce spend instead. */
     fun totalIncomeInPaise(transactions: List<Transaction>): Long =
         transactions.filter(::isIncome).sumOf { it.amountInPaise }
+
+    /**
+     * How much this row moves the balance of the account it sits on.
+     *
+     * The mirror of [isSpend], for balances rather than totals: spending is about whether money left
+     * the owner's hands, while a balance is about whether money left *this account* — which a
+     * transfer very much does, on both ends and in opposite directions.
+     *
+     * Credit cards need no special case. A purchase makes the balance more negative and paying the
+     * bill brings it back toward zero, which is exactly what an outstanding amount is; only the
+     * wording differs, and that is the UI's business.
+     *
+     * Rows with no usable meaning contribute nothing: an unparsed amount, something the owner
+     * ignored, a flagged duplicate, and a transfer leg whose role was never established — guessing
+     * a direction there would move money the wrong way, which is worse than not moving it.
+     */
+    fun signedDeltaInPaise(t: Transaction): Long {
+        if (!isCounted(t)) return 0L
+        return when (t.type) {
+            TransactionType.EXPENSE -> -t.amountInPaise
+            TransactionType.INCOME,
+            TransactionType.REFUND,
+            TransactionType.CASHBACK -> t.amountInPaise
+            TransactionType.TRANSFER -> when (t.transferRole) {
+                TransferRole.OUT -> -t.amountInPaise
+                TransferRole.IN -> t.amountInPaise
+                null -> 0L
+            }
+            TransactionType.UNKNOWN -> 0L
+        }
+    }
 }

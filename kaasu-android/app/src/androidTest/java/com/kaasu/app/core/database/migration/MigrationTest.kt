@@ -6,7 +6,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kaasu.app.core.database.KaasuDatabase
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -104,12 +103,38 @@ class MigrationTest {
     }
 
     @Test
+    fun migrate9To10_addsBalanceColumnsAsUnsetRatherThanZero() {
+        val db = helper.createDatabase(TEST_DB, 9)
+        db.execSQL(
+            "INSERT INTO accounts (displayName, lastFourDigits, accountType, colorArgb, isActive, createdAt) " +
+                "VALUES ('Union Bank', '5678', 'SAVINGS', NULL, 1, 0)"
+        )
+        db.close()
+
+        val migrated = helper.runMigrationsAndValidate(TEST_DB, 10, true, MIGRATION_9_10)
+
+        migrated.query("SELECT * FROM accounts").use { c ->
+            assertEquals(1, c.count)
+            assertTrue(c.moveToFirst())
+            assertEquals("Union Bank", c.getString(c.getColumnIndexOrThrow("displayName")))
+            // Null, not 0. A zero here would be Kaasu claiming to know a balance it has never been
+            // told, and every account would silently report a confident wrong figure.
+            assertTrue(c.isNull(c.getColumnIndexOrThrow("openingBalanceInPaise")))
+            assertTrue(c.isNull(c.getColumnIndexOrThrow("openingBalanceAt")))
+            assertTrue(c.isNull(c.getColumnIndexOrThrow("lastStatedBalanceInPaise")))
+            assertTrue(c.isNull(c.getColumnIndexOrThrow("creditLimitInPaise")))
+            assertTrue(c.isNull(c.getColumnIndexOrThrow("dueDay")))
+        }
+        migrated.close()
+    }
+
+    @Test
     fun migrateAll_fromTheOldestSchema() {
         helper.createDatabase(TEST_DB, 1).close()
         helper.runMigrationsAndValidate(
-            TEST_DB, 9, true,
+            TEST_DB, 10, true,
             MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
-            MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+            MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
         ).close()
     }
 

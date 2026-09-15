@@ -11,4 +11,6 @@ interface AccountRepository {
     suspend fun insert(account: Account): Long
     suspend fun update(account: Account)
     suspend fun delete(id: Long)
+    /** Records the bank's own stated balance, for reconciliation. Advisory only. */
+    suspend fun setLastStatedBalance(id: Long, balanceInPaise: Long, at: Long)
 }

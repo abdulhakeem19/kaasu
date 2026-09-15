@@ -39,9 +39,9 @@ class BackupManager @Inject constructor(
     private val settings: SettingsDataStore,
 ) {
     companion object {
-        // 2 adds transfer groups to transactions, plus the three settings that were quietly
-        // being lost on restore. Version-1 files still restore: every added key reads as absent.
-        const val VERSION = 2
+        // 2 added transfer groups plus three settings that were quietly lost on restore; 3 adds
+        // account balances. Older files still restore — every added key reads as absent.
+        const val VERSION = 3
         const val FILE_NAME = "kaasu_backup.json"
     }
 
@@ -154,12 +154,23 @@ class BackupManager @Inject constructor(
     private fun accToJson(a: AccountEntity) = JSONObject().apply {
         put("id", a.id); put("displayName", a.displayName); putN("lastFourDigits", a.lastFourDigits)
         put("accountType", a.accountType); putN("colorArgb", a.colorArgb); put("isActive", a.isActive); put("createdAt", a.createdAt)
+        // Losing the opening balance on restore would silently reset every balance to "unknown",
+        // and re-entering them is the one part of setup only the owner can do.
+        putN("openingBalanceInPaise", a.openingBalanceInPaise); putN("openingBalanceAt", a.openingBalanceAt)
+        putN("lastStatedBalanceInPaise", a.lastStatedBalanceInPaise); putN("lastStatedBalanceAt", a.lastStatedBalanceAt)
+        putN("creditLimitInPaise", a.creditLimitInPaise); putN("statementDay", a.statementDay); putN("dueDay", a.dueDay)
     }
 
     private fun jsonToAcc(o: JSONObject) = AccountEntity(
         id = o.getLong("id"), displayName = o.getString("displayName"), lastFourDigits = o.strOrNull("lastFourDigits"),
         accountType = o.getString("accountType"), colorArgb = o.intOrNull("colorArgb"),
-        isActive = o.optBoolean("isActive", true), createdAt = o.getLong("createdAt")
+        isActive = o.optBoolean("isActive", true), createdAt = o.getLong("createdAt"),
+        openingBalanceInPaise = o.longOrNull("openingBalanceInPaise"),
+        openingBalanceAt = o.longOrNull("openingBalanceAt"),
+        lastStatedBalanceInPaise = o.longOrNull("lastStatedBalanceInPaise"),
+        lastStatedBalanceAt = o.longOrNull("lastStatedBalanceAt"),
+        creditLimitInPaise = o.longOrNull("creditLimitInPaise"),
+        statementDay = o.intOrNull("statementDay"), dueDay = o.intOrNull("dueDay")
     )
 
     private fun ruleToJson(r: RuleEntity) = JSONObject().apply {
