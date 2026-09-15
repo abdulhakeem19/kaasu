@@ -48,5 +48,10 @@ interface TransactionRepository {
     suspend fun update(transaction: Transaction)
     suspend fun delete(transaction: Transaction)
     suspend fun deleteById(id: Long)
+    // ── Transfer groups ──
+    suspend fun getByTransferGroup(groupId: String): List<Transaction>
+    fun observeHalfLinkedTransfers(): Flow<List<Transaction>>
+    suspend fun deleteByTransferGroup(groupId: String)
+
     suspend fun deleteAll()
 }

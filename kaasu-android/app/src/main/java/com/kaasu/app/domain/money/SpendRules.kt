@@ -2,6 +2,7 @@ package com.kaasu.app.domain.money
 
 import com.kaasu.app.domain.model.Transaction
 import com.kaasu.app.domain.model.TransactionType
+import com.kaasu.app.domain.model.TransferRole
 
 /**
  * The single definition of what counts as spending.
@@ -54,8 +55,14 @@ object SpendRules {
      * accounts is not spending, but it did leave, and a transaction list that showed it as a credit
      * would be lying about the direction. Totals use [isSpend]; rows use this.
      */
-    fun isOutflow(t: Transaction): Boolean =
-        isCounted(t) && (t.type == TransactionType.EXPENSE || t.type == TransactionType.TRANSFER)
+    fun isOutflow(t: Transaction): Boolean = isCounted(t) && when (t.type) {
+        TransactionType.EXPENSE -> true
+        // Only the leg the money left is an outflow. Before transfers had roles there was no way to
+        // tell the two ends apart, so both rendered with a minus — the receiving account appeared to
+        // lose the money it had just gained.
+        TransactionType.TRANSFER -> t.transferRole != TransferRole.IN
+        else -> false
+    }
 
     /**
      * Spend minus what came back.

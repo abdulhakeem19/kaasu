@@ -71,7 +71,7 @@ class TransactionBackfillManager @Inject constructor(
             // one, so a row gains its name and its category in the same pass.
             val newCategory = if (row.categoryId == null) {
                 val merchantForRules = row.merchantName?.takeIf { it.isNotBlank() } ?: parsed.merchantName
-                categoryRuleEngine.classify(merchantForRules, row.sourceAppPackage)
+                categoryRuleEngine.classifyCategory(merchantForRules, row.sourceAppPackage)
                     ?: merchantForRules?.let { dao.getLearnedCategoryIdByMerchant(it) }
             } else {
                 null

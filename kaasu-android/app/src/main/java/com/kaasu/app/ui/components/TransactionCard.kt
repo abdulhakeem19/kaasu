@@ -28,6 +28,7 @@ import com.kaasu.app.core.util.toComposeColor
 import com.kaasu.app.domain.model.Category
 import com.kaasu.app.domain.model.Transaction
 import com.kaasu.app.domain.model.TransactionType
+import com.kaasu.app.domain.money.TransferLabel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -39,13 +40,18 @@ fun TransactionCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     accountName: String? = null,
-    lastFourDigits: String? = null
+    lastFourDigits: String? = null,
+    counterpartAccountName: String? = null,
 ) {
     val timeLabel = SimpleDateFormat("h:mm a", LocalConfiguration.current.locales[0])
         .format(Date(transaction.transactionTime))
     val (chipBg, chipText, amountColor, amountPrefix) = resolveColors(transaction.type, category)
-    val initial = (transaction.merchantName?.firstOrNull()?.uppercaseChar()
-        ?: transaction.type.name.first())
+    // A transfer names the two accounts instead of a merchant — there is no shop involved, and
+    // "where did this money go" is the only question worth answering about it.
+    val title = TransferLabel.of(transaction, accountName, counterpartAccountName)
+        ?: transaction.merchantName
+        ?: "Unknown"
+    val initial = (title.firstOrNull()?.uppercaseChar() ?: transaction.type.name.first())
 
     Row(
         modifier = modifier
@@ -76,7 +82,7 @@ fun TransactionCard(
 
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                text = transaction.merchantName ?: "Unknown",
+                text = title,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
                 color = KaasuColors.ink,

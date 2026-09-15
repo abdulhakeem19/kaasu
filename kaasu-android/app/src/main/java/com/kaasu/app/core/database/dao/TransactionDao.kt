@@ -182,6 +182,34 @@ interface TransactionDao {
     suspend fun deleteAll()
 
     // Full snapshot (includes ignored/split-parent rows) for backup
+    // ── Transfer groups ───────────────────────────────────────────────────────────────────────
+
+    @Query("SELECT * FROM transactions WHERE transferGroupId = :groupId ORDER BY transactionTime ASC")
+    suspend fun getByTransferGroup(groupId: String): List<TransactionEntity>
+
+    /**
+     * Groups with only one leg captured, newest first.
+     *
+     * Expected rather than broken: a credit card usually announces nothing when its bill is paid,
+     * so the savings debit arrives alone. These are what the "Where did this go?" prompt offers to
+     * complete, and the same list is the manual fallback when pairing fails.
+     */
+    @Query("""
+        SELECT * FROM transactions
+        WHERE transferGroupId IS NOT NULL
+          AND isIgnored = 0
+          AND transferGroupId IN (
+            SELECT transferGroupId FROM transactions
+            WHERE transferGroupId IS NOT NULL AND isIgnored = 0
+            GROUP BY transferGroupId HAVING COUNT(*) = 1
+          )
+        ORDER BY transactionTime DESC
+    """)
+    fun observeHalfLinkedTransfers(): Flow<List<TransactionEntity>>
+
+    @Query("DELETE FROM transactions WHERE transferGroupId = :groupId")
+    suspend fun deleteByTransferGroup(groupId: String)
+
     @Query("SELECT * FROM transactions")
     suspend fun getAllForBackup(): List<TransactionEntity>
 }
