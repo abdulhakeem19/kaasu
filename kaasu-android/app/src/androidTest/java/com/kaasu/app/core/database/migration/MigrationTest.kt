@@ -63,8 +63,10 @@ class MigrationTest {
     fun migrate8To9_turnsSeededCardBillRulesIntoTypeOverrides() {
         val db = helper.createDatabase(TEST_DB, 8)
         // How an existing install looks: the double-count encoded as a seeded rule.
-        db.execSQL("INSERT INTO categories (name, icon, colorHex, type, isSystem, isActive, sortOrder, createdAt, updatedAt) " +
-            "VALUES ('Bills', 'receipt', '#888888', 'EXPENSE', 1, 1, 0, 0, 0)")
+        db.execSQL(
+            "INSERT INTO categories (name, icon, color, type, isDefault, isArchived, createdAt, updatedAt) " +
+                "VALUES ('Bills', 'receipt', '#888888', 'EXPENSE', 1, 0, 0, 0)"
+        )
         db.execSQL(
             """INSERT INTO rules (name, matchText, matchType, categoryId, transactionType,
                sourceAppPackage, priority, isSystem, isActive, createdAt, updatedAt)
