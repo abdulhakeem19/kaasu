@@ -91,7 +91,7 @@ jobs:
       # Verified afterwards with:
       #   gh attestation verify kaasu-<version>.apk --repo abdulhakeem19/kaasu
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: dist/kaasu-${{ steps.stage.outputs.version }}.apk
 
