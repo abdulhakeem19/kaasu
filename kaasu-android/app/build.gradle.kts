@@ -122,7 +122,7 @@ dependencies {
     // without adding an edge, and raising core (rather than lowering json) keeps the app and its
     // instrumented tests on one version, which is the point of consistent resolution.
     constraints {
-        implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.8.1") {
+        implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0") {
             because("room-testing's serialization-json 1.8.1 requires core 1.8.x")
         }
     }
